@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grafana - Infrastructure Dashboard</title>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #111217; color: #cdd9e5; }
+        .dashboard-header { padding: 20px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; }
+        .panel-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; padding: 20px; }
+        .panel { background-color: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 15px; }
+        .panel-title { font-size: 14px; color: #8b949e; margin-bottom: 10px; text-transform: uppercase; }
+        .metric-value { font-size: 32px; font-weight: bold; color: #58a6ff; }
+        .metric-danger { color: #f85149; }
+        .metric-success { color: #3fb950; }
+    </style>
+</head>
+<body>
+    <div class="dashboard-header">
+        <h1>Kubernetes Cluster Monitoring (us-east-1)</h1>
+        <span>Last updated: 2026-07-22 09:45:12 UTC</span>
+    </div>
+    <div class="panel-grid">
+        <div class="panel">
+            <div class="panel-title">Overall Cluster CPU Usage</div>
+            <div class="metric-value">64.2%</div>
+            <p style="font-size: 12px; color: #8b949e;">Total cores: 1024 | Used: 657.4</p>
+        </div>
+        <div class="panel">
+            <div class="panel-title">API Gateway p99 Latency</div>
+            <div class="metric-value metric-danger">245 ms</div>
+            <p style="font-size: 12px; color: #8b949e;">Threshold: < 150 ms (Alert active)</p>
+        </div>
+        <div class="panel">
+            <div class="panel-title">Database Active Connections</div>
+            <div class="metric-value metric-success">1,204</div>
+            <p style="font-size: 12px; color: #8b949e;">Max pool size: 5000 (Healthy)</p>
+        </div>
+        <div class="panel">
+            <div class="panel-title">Kafka Message Throughput</div>
+            <div class="metric-value">45,892 msg/s</div>
+            <p style="font-size: 12px; color: #8b949e;">Partition spread: 98% balanced</p>
+        </div>
+        <div class="panel">
+            <div class="panel-title">Error Rate (HTTP 5xx)</div>
+            <div class="metric-value metric-success">0.04%</div>
+            <p style="font-size: 12px; color: #8b949e;">Global baseline: 0.1%</p>
+        </div>
+        <div class="panel">
+            <div class="panel-title">Redis Cache Hit Ratio</div>
+            <div class="metric-value">92.8%</div>
+            <p style="font-size: 12px; color: #8b949e;">Evictions: 0 in last 24h</p>
+        </div>
+    </div>
+</body>
+</html>

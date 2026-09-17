@@ -1,0 +1,119 @@
+# ==========================================
+# AgentForge · 智炼工坊 Git 忽略文件规范 (.gitignore)
+# ==========================================
+
+# 1. Python 虚拟环境与依赖
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+develop-eggs/
+downloads/
+eggs/
+parts/
+var/
+wheels/
+share/python-wheels/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 2. 单元测试与代码覆盖率缓存
+.pytest_cache/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+htmlcov/
+
+# 3. 前端与 Node.js 构建产物
+node_modules/
+**/node_modules/
+dist/
+frontend-react/dist/
+frontend-react/.vite/
+.eslintcache
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 4. 数据库、事务锁与持久化缓存 (运行时产生)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+checkpoints.sqlite*
+chroma_db/
+**/chroma_db/
+**/chroma_cache/
+**/comprehensive_profile_db/
+vector_db.json
+*.pickle
+*.pkl
+
+# 5. 模型权重、缓存与预训练大文件 (超限大文件，避免污染版本库)
+models/
+**/models/
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.onnx
+
+# 6. 超大多媒体测试音频与视频样本 (如 26MB+ 录音)
+*.m4a
+*.mp3
+*.mp4
+*.wav
+*.flac
+
+# 7. 系统运行日志与临时状态
+*.log
+logs/
+**/*.log
+backend/backend.log
+backend/main_restart.log
+frontend-react/frontend.log
+.playwright-cli/
+scratch/
+tmp/
+temp/
+
+# 8. 隐私环境配置与密钥证书
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.cert
+
+# 9. 操作系统与 IDE 编辑器配置文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.gitnexus/

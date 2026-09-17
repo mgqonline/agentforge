@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<note>
+  <to>AI 助手</to>
+  <from>用户</from>
+  <heading>测试 XML 解析</heading>
+  <body>请解析这里的节点内容！</body>
+</note>

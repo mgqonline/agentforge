@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Logs - Agent Orchestrator</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        body {
+            background-color: #0b0f19;
+            color: #f8fafc;
+            font-family: 'Fira Code', 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 20px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+        .title { font-size: 1.5rem; color: #38bdf8; }
+        .log-item {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .log-meta {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            margin-bottom: 12px;
+            display: flex;
+            gap: 12px;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 8px;
+        }
+        .type-badge {
+            background: rgba(56, 189, 248, 0.2);
+            color: #38bdf8;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin: 0;
+            font-size: 0.9rem;
+            color: #10b981;
+        }
+        .empty { text-align: center; color: #64748b; margin-top: 50px; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="header">
+            <div class="title">📄 底层 API 流转日志监控</div>
+            <div>
+                <button @click="refreshLogs" style="background:#38bdf8;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-weight:bold;">刷新最新日志</button>
+            </div>
+        </div>
+
+        <div v-if="logs.length === 0" class="empty">
+            暂无日志数据，请先在主页与 Agent 交互。
+        </div>
+
+        <div v-for="(log, idx) in logs" :key="idx" class="log-item">
+            <div class="log-meta">
+                <span class="type-badge">{{ log.type }}</span>
+                <span>{{ log.timestamp }}</span>
+            </div>
+            <pre>{{ formatData(log.data) }}</pre>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                const logs = ref([]);
+
+                const refreshLogs = () => {
+                    const saved = localStorage.getItem('agent_logs');
+                    if (saved) {
+                        try {
+                            logs.value = JSON.parse(saved);
+                        } catch (e) {
+                            console.error("Parse error", e);
+                        }
+                    }
+                };
+
+                const formatData = (data) => {
+                    if (typeof data === 'object') {
+                        return JSON.stringify(data, null, 2);
+                    }
+                    return data;
+                };
+
+                onMounted(() => {
+                    refreshLogs();
+                    // 定时刷新以获取最新状态
+                    setInterval(refreshLogs, 2000);
+                });
+
+                return { logs, refreshLogs, formatData };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

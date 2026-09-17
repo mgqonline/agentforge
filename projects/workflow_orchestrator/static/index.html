@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Orchestrator | Chat</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        :root {
+            --bg-base: #0b0f19;
+            --glass-bg: rgba(20, 25, 40, 0.6);
+            --glass-border: rgba(100, 116, 139, 0.2);
+            --neon-blue: #38bdf8;
+            --neon-purple: #a855f7;
+            --neon-green: #10b981;
+            --neon-red: #ef4444;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 30px 30px;
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 900px;
+            height: 90vh;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            box-shadow: 0 10px 40px -10px rgba(0,0,0,0.7);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 18px 24px;
+            border-bottom: 1px solid var(--glass-border);
+            background: rgba(0, 0, 0, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .panel-title::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: var(--neon-blue);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--neon-blue);
+        }
+
+        .log-btn {
+            background: rgba(255,255,255,0.1);
+            color: var(--text-main);
+            border: 1px solid var(--glass-border);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .log-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .chat-list {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .msg-bubble {
+            max-width: 85%;
+            padding: 16px;
+            border-radius: 12px;
+            line-height: 1.6;
+            font-size: 0.95rem;
+            animation: slideUp 0.3s ease;
+        }
+
+        .msg-user {
+            align-self: flex-end;
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            color: var(--neon-blue);
+            border-bottom-right-radius: 4px;
+        }
+
+        .msg-agent {
+            align-self: flex-start;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            border-bottom-left-radius: 4px;
+        }
+
+        .input-bar {
+            padding: 20px 24px;
+            border-top: 1px solid var(--glass-border);
+            background: rgba(0, 0, 0, 0.2);
+            display: flex;
+            gap: 12px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--glass-border);
+            padding: 14px 20px;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--neon-purple);
+            box-shadow: 0 0 15px rgba(168, 85, 247, 0.2);
+        }
+
+        button.btn-primary {
+            background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple));
+            color: #fff;
+            border: none;
+            padding: 0 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        button.btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(168, 85, 247, 0.4);
+        }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* 内嵌工单卡片样式 */
+        .approval-card {
+            background: rgba(239, 68, 68, 0.05);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 10px;
+        }
+        .card-title {
+            color: var(--neon-red);
+            font-weight: bold;
+            margin-bottom: 12px;
+        }
+        .json-block {
+            background: #000;
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8rem;
+            color: var(--neon-green);
+            overflow-x: auto;
+            margin-bottom: 16px;
+            border: 1px solid #222;
+        }
+        .action-btns {
+            display: flex;
+            gap: 10px;
+        }
+        .btn-approve {
+            flex: 1; background: rgba(16, 185, 129, 0.1); color: var(--neon-green);
+            border: 1px solid var(--neon-green); padding: 8px; border-radius: 6px; cursor: pointer;
+        }
+        .btn-approve:hover { background: var(--neon-green); color: #000; }
+        
+        .btn-reject {
+            flex: 1; background: rgba(239, 68, 68, 0.1); color: var(--neon-red);
+            border: 1px solid var(--neon-red); padding: 8px; border-radius: 6px; cursor: pointer;
+        }
+        .btn-reject:hover { background: var(--neon-red); color: #fff; }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .tag {
+            display: inline-block;
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-right: 8px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .tag.risk { color: var(--neon-red); border-color: var(--neon-red); }
+        .tag.intent { color: var(--neon-purple); border-color: var(--neon-purple); }
+
+    </style>
+</head>
+<body>
+    <div id="app" style="display: contents;">
+        <div class="app-container">
+            <div class="panel-header">
+                <div class="panel-title">LangGraph Agent Stream</div>
+                <button class="log-btn" @click="openLogs">📄 查阅系统日志</button>
+            </div>
+            
+            <div class="chat-list" id="chatList">
+                <div class="msg-bubble msg-agent">
+                    System Initialized. 🧠 LLM Router (Deepseek-V3) connected.<br>
+                    请输入业务指令。如涉及高危操作，将会在当前流程中挂起并要求授权。
+                </div>
+                
+                <div v-for="(msg, idx) in messages" :key="idx"
+                     :class="['msg-bubble', msg.role === 'user' ? 'msg-user' : 'msg-agent']">
+                     
+                    <div v-if="msg.meta" style="margin-bottom: 10px;">
+                        <span class="tag intent">{{ msg.meta.intent }}</span>
+                        <span v-if="msg.meta.requires_approval" class="tag risk">⚠️ 高危拦截</span>
+                    </div>
+                    
+                    <div v-html="formatText(msg.content)"></div>
+
+                    <!-- 挂起拦截的审批卡片，嵌在对话流中 -->
+                    <div v-if="msg.pendingTask" class="approval-card">
+                        <div class="card-title">🚨 敏感操作审批确认</div>
+                        <div style="font-size: 0.85rem; margin-bottom: 4px;">提取到的调用参数 (Raw JSON):</div>
+                        <div class="json-block">{{ JSON.stringify(msg.pendingTask.params, null, 2) }}</div>
+                        <div class="action-btns">
+                            <button class="btn-approve" @click="handleApproval(msg, true)">✅ Approve (放行)</button>
+                            <button class="btn-reject" @click="handleApproval(msg, false)">⛔ Reject (熔断)</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="loading" class="msg-bubble msg-agent" style="opacity: 0.7">
+                    <i>Agent is thinking and executing API calls...</i>
+                </div>
+            </div>
+
+            <div class="input-bar">
+                <input type="text" v-model="inputText" @keyup.enter="sendTask" 
+                       placeholder="e.g. 查询今天的数据 / 强制删除所有订单" :disabled="loading">
+                <button class="btn-primary" @click="sendTask" :disabled="loading || !inputText.trim()">Execute</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, nextTick, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                const inputText = ref('');
+                const messages = ref([]);
+                const loading = ref(false);
+                const logs = ref([]);
+
+                onMounted(() => {
+                    // 初始化时清空上一次日志记录
+                    localStorage.setItem('agent_logs', JSON.stringify([]));
+                });
+
+                const scrollToBottom = async () => {
+                    await nextTick();
+                    const list = document.getElementById('chatList');
+                    list.scrollTop = list.scrollHeight;
+                };
+
+                const formatText = (text) => text.replace(/\n/g, '<br>');
+
+                const saveLog = (logItem) => {
+                    logItem.timestamp = new Date().toLocaleString();
+                    logs.value.unshift(logItem);
+                    localStorage.setItem('agent_logs', JSON.stringify(logs.value));
+                };
+
+                const openLogs = () => {
+                    window.open('logs.html', '_blank');
+                };
+
+                const sendTask = async () => {
+                    if (!inputText.value.trim() || loading.value) return;
+                    
+                    const currentTask = inputText.value;
+                    messages.value.push({ role: 'user', content: currentTask });
+                    saveLog({ type: 'user_input', data: currentTask });
+                    
+                    inputText.value = '';
+                    await executeApi(currentTask, false);
+                };
+
+                const executeApi = async (taskStr, isApproved) => {
+                    loading.value = true;
+                    scrollToBottom();
+                    
+                    try {
+                        const response = await fetch('/api/v1/execute', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                task: taskStr,
+                                is_approved: isApproved
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        saveLog({ type: 'api_response', data: data });
+                        
+                        // 需要审批且尚未通过
+                        if (data.requires_approval && !isApproved) {
+                            messages.value.push({
+                                role: 'agent',
+                                content: `已检测到高危指令。当前流程已挂起，请审查下方 JSON 负载并进行授权。`,
+                                meta: { intent: data.intent, requires_approval: true },
+                                pendingTask: {
+                                    taskStr: taskStr,
+                                    params: data.api_params || { warning: "解析参数暂未返回" }
+                                }
+                            });
+                        } else {
+                            messages.value.push({
+                                role: 'agent',
+                                content: data.final_response || "执行完成。",
+                                meta: { intent: data.intent, requires_approval: data.requires_approval }
+                            });
+                        }
+                    } catch (error) {
+                        saveLog({ type: 'error', data: error.toString() });
+                        messages.value.push({
+                            role: 'agent',
+                            content: "❌ API 请求异常，请检查后端运行状态。"
+                        });
+                    } finally {
+                        loading.value = false;
+                        scrollToBottom();
+                    }
+                };
+
+                const handleApproval = async (msgObj, isApproved) => {
+                    const taskStr = msgObj.pendingTask.taskStr;
+                    msgObj.pendingTask = null; // 移除卡片
+                    
+                    if (isApproved) {
+                        messages.value.push({ role: 'user', content: `[Admin Approved]: 已授权放行上述操作。` });
+                        saveLog({ type: 'admin_action', data: 'Approved' });
+                        await executeApi(taskStr, true);
+                    } else {
+                        messages.value.push({ role: 'agent', content: `🚨 管理员已阻断该任务。` });
+                        saveLog({ type: 'admin_action', data: 'Rejected' });
+                    }
+                };
+
+                return { 
+                    inputText, messages, loading, 
+                    sendTask, handleApproval, formatText, openLogs
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

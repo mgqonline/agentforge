@@ -1,0 +1,150 @@
+hostname,ip_address,os,cpu_cores,ram_gb,role,datacenter
+worker-node-ap-southeast-2-001,10.212.93.37,Amazon Linux 2,32,64,worker_node,ap-southeast-2
+database-replica-us-east-1b-002,10.235.150.191,Debian 11,64,128,database_replica,us-east-1b
+cache-redis-ap-northeast-1-003,10.207.146.165,Alpine Linux 3.14,64,256,cache_redis,ap-northeast-1
+web-frontend-ap-northeast-1-004,10.151.55.187,CentOS 8,64,256,web_frontend,ap-northeast-1
+message-broker-us-east-1a-005,10.233.251.186,Ubuntu 22.04,8,32,message_broker,us-east-1a
+api-gateway-us-east-1a-006,10.30.253.108,Alpine Linux 3.14,16,32,api_gateway,us-east-1a
+message-broker-ap-southeast-2-007,10.39.110.72,Debian 11,4,8,message_broker,ap-southeast-2
+cache-redis-eu-central-1-008,10.67.71.170,Amazon Linux 2,4,8,cache_redis,eu-central-1
+database-primary-us-east-1b-009,10.118.117.111,CentOS 8,64,256,database_primary,us-east-1b
+cache-redis-eu-central-1-010,10.79.139.194,CentOS 8,4,8,cache_redis,eu-central-1
+cache-redis-us-east-1b-011,10.215.55.139,CentOS 8,8,16,cache_redis,us-east-1b
+worker-node-us-east-1b-012,10.70.36.251,Ubuntu 22.04,32,64,worker_node,us-east-1b
+database-primary-ap-southeast-2-013,10.46.171.74,Ubuntu 22.04,4,16,database_primary,ap-southeast-2
+database-primary-us-east-1a-014,10.76.67.116,Alpine Linux 3.14,4,16,database_primary,us-east-1a
+api-gateway-ap-southeast-2-015,10.17.94.127,Alpine Linux 3.14,64,256,api_gateway,ap-southeast-2
+message-broker-ap-northeast-1-016,10.149.54.115,Amazon Linux 2,32,64,message_broker,ap-northeast-1
+api-gateway-ap-southeast-2-017,10.146.147.217,Debian 11,4,16,api_gateway,ap-southeast-2
+api-gateway-us-east-1b-018,10.75.114.203,Debian 11,32,64,api_gateway,us-east-1b
+web-frontend-us-east-1a-019,10.180.204.229,CentOS 8,16,64,web_frontend,us-east-1a
+worker-node-eu-central-1-020,10.167.104.132,Alpine Linux 3.14,4,16,worker_node,eu-central-1
+web-frontend-ap-southeast-2-021,10.240.47.138,Debian 11,16,32,web_frontend,ap-southeast-2
+api-gateway-us-east-1a-022,10.159.57.23,Amazon Linux 2,4,8,api_gateway,us-east-1a
+worker-node-eu-central-1-023,10.48.142.149,CentOS 8,4,8,worker_node,eu-central-1
+database-replica-eu-central-1-024,10.62.145.157,Amazon Linux 2,64,256,database_replica,eu-central-1
+database-replica-ap-northeast-1-025,10.202.69.138,Ubuntu 22.04,4,16,database_replica,ap-northeast-1
+cache-redis-us-east-1a-026,10.219.192.102,Ubuntu 22.04,64,256,cache_redis,us-east-1a
+cache-redis-us-east-1a-027,10.242.143.173,Amazon Linux 2,64,128,cache_redis,us-east-1a
+cache-redis-ap-northeast-1-028,10.19.117.219,CentOS 8,8,32,cache_redis,ap-northeast-1
+cache-redis-ap-northeast-1-029,10.219.125.252,Alpine Linux 3.14,32,128,cache_redis,ap-northeast-1
+message-broker-us-east-1b-030,10.8.168.102,Ubuntu 22.04,8,16,message_broker,us-east-1b
+worker-node-ap-southeast-2-031,10.5.161.42,Ubuntu 22.04,4,8,worker_node,ap-southeast-2
+api-gateway-eu-central-1-032,10.132.234.23,Alpine Linux 3.14,16,32,api_gateway,eu-central-1
+message-broker-us-east-1a-033,10.68.17.158,Ubuntu 22.04,8,32,message_broker,us-east-1a
+message-broker-eu-central-1-034,10.49.231.100,Debian 11,64,128,message_broker,eu-central-1
+cache-redis-ap-northeast-1-035,10.146.78.7,Debian 11,32,128,cache_redis,ap-northeast-1
+database-replica-ap-northeast-1-036,10.89.140.134,Ubuntu 22.04,32,128,database_replica,ap-northeast-1
+worker-node-eu-central-1-037,10.85.45.170,Ubuntu 22.04,8,16,worker_node,eu-central-1
+database-replica-us-east-1b-038,10.200.133.212,Alpine Linux 3.14,4,8,database_replica,us-east-1b
+api-gateway-ap-southeast-2-039,10.94.6.102,Debian 11,32,128,api_gateway,ap-southeast-2
+database-replica-us-east-1a-040,10.124.115.36,Amazon Linux 2,8,32,database_replica,us-east-1a
+cache-redis-ap-northeast-1-041,10.229.171.179,Amazon Linux 2,32,128,cache_redis,ap-northeast-1
+web-frontend-us-east-1a-042,10.15.90.62,Alpine Linux 3.14,64,128,web_frontend,us-east-1a
+database-replica-us-east-1b-043,10.18.204.75,Debian 11,16,32,database_replica,us-east-1b
+api-gateway-ap-southeast-2-044,10.190.68.179,CentOS 8,4,16,api_gateway,ap-southeast-2
+web-frontend-ap-southeast-2-045,10.246.128.36,Debian 11,64,128,web_frontend,ap-southeast-2
+message-broker-eu-central-1-046,10.6.34.253,Debian 11,4,8,message_broker,eu-central-1
+worker-node-us-east-1b-047,10.192.132.166,CentOS 8,32,128,worker_node,us-east-1b
+worker-node-ap-northeast-1-048,10.52.122.72,Debian 11,64,128,worker_node,ap-northeast-1
+cache-redis-us-east-1b-049,10.94.144.71,Alpine Linux 3.14,8,16,cache_redis,us-east-1b
+cache-redis-ap-southeast-2-050,10.133.204.41,Amazon Linux 2,8,32,cache_redis,ap-southeast-2
+worker-node-us-east-1b-051,10.103.236.253,Debian 11,16,32,worker_node,us-east-1b
+database-primary-eu-central-1-052,10.224.94.9,Debian 11,64,128,database_primary,eu-central-1
+web-frontend-us-east-1a-053,10.167.220.9,CentOS 8,4,16,web_frontend,us-east-1a
+api-gateway-ap-southeast-2-054,10.186.127.45,Ubuntu 22.04,16,64,api_gateway,ap-southeast-2
+database-primary-eu-central-1-055,10.145.2.5,Ubuntu 22.04,32,128,database_primary,eu-central-1
+web-frontend-ap-northeast-1-056,10.108.83.59,Debian 11,8,16,web_frontend,ap-northeast-1
+api-gateway-ap-northeast-1-057,10.96.191.228,CentOS 8,8,16,api_gateway,ap-northeast-1
+web-frontend-eu-central-1-058,10.93.177.12,CentOS 8,32,128,web_frontend,eu-central-1
+web-frontend-ap-southeast-2-059,10.176.91.43,Amazon Linux 2,16,32,web_frontend,ap-southeast-2
+api-gateway-ap-southeast-2-060,10.149.105.159,Alpine Linux 3.14,8,16,api_gateway,ap-southeast-2
+api-gateway-ap-southeast-2-061,10.179.97.210,CentOS 8,16,64,api_gateway,ap-southeast-2
+database-replica-ap-southeast-2-062,10.128.117.187,Amazon Linux 2,16,64,database_replica,ap-southeast-2
+api-gateway-us-east-1a-063,10.249.69.158,Alpine Linux 3.14,64,256,api_gateway,us-east-1a
+message-broker-us-east-1a-064,10.173.155.154,Debian 11,32,128,message_broker,us-east-1a
+worker-node-ap-northeast-1-065,10.220.203.245,Ubuntu 22.04,16,64,worker_node,ap-northeast-1
+database-replica-us-east-1b-066,10.190.3.68,Amazon Linux 2,8,16,database_replica,us-east-1b
+message-broker-eu-central-1-067,10.113.243.91,Debian 11,32,128,message_broker,eu-central-1
+web-frontend-us-east-1b-068,10.170.65.66,Amazon Linux 2,8,16,web_frontend,us-east-1b
+worker-node-eu-central-1-069,10.31.103.18,Amazon Linux 2,32,64,worker_node,eu-central-1
+worker-node-us-east-1b-070,10.207.47.215,Amazon Linux 2,64,256,worker_node,us-east-1b
+message-broker-us-east-1a-071,10.157.121.146,Amazon Linux 2,16,32,message_broker,us-east-1a
+web-frontend-us-east-1a-072,10.187.67.113,Debian 11,16,64,web_frontend,us-east-1a
+message-broker-us-east-1a-073,10.40.246.65,CentOS 8,4,8,message_broker,us-east-1a
+database-replica-ap-northeast-1-074,10.61.187.155,CentOS 8,8,16,database_replica,ap-northeast-1
+database-replica-us-east-1a-075,10.188.129.233,Amazon Linux 2,8,16,database_replica,us-east-1a
+web-frontend-us-east-1b-076,10.209.57.3,Debian 11,32,64,web_frontend,us-east-1b
+worker-node-us-east-1b-077,10.31.102.176,Ubuntu 22.04,16,32,worker_node,us-east-1b
+cache-redis-ap-southeast-2-078,10.88.178.218,CentOS 8,8,32,cache_redis,ap-southeast-2
+web-frontend-ap-northeast-1-079,10.205.249.9,Amazon Linux 2,16,64,web_frontend,ap-northeast-1
+database-primary-ap-northeast-1-080,10.177.104.14,Amazon Linux 2,32,128,database_primary,ap-northeast-1
+message-broker-us-east-1a-081,10.247.151.154,Debian 11,16,64,message_broker,us-east-1a
+worker-node-ap-southeast-2-082,10.62.201.107,CentOS 8,64,256,worker_node,ap-southeast-2
+message-broker-eu-central-1-083,10.121.36.189,CentOS 8,64,256,message_broker,eu-central-1
+cache-redis-us-east-1b-084,10.97.83.162,CentOS 8,8,32,cache_redis,us-east-1b
+message-broker-us-east-1b-085,10.145.137.230,Debian 11,8,32,message_broker,us-east-1b
+web-frontend-eu-central-1-086,10.81.102.4,Amazon Linux 2,32,64,web_frontend,eu-central-1
+cache-redis-eu-central-1-087,10.255.63.224,Amazon Linux 2,4,8,cache_redis,eu-central-1
+web-frontend-us-east-1b-088,10.86.120.94,Debian 11,64,128,web_frontend,us-east-1b
+cache-redis-us-east-1b-089,10.225.169.73,Amazon Linux 2,4,16,cache_redis,us-east-1b
+message-broker-ap-northeast-1-090,10.216.167.237,Amazon Linux 2,16,64,message_broker,ap-northeast-1
+web-frontend-us-east-1a-091,10.235.228.178,Ubuntu 22.04,32,128,web_frontend,us-east-1a
+worker-node-us-east-1b-092,10.139.35.244,Amazon Linux 2,32,64,worker_node,us-east-1b
+database-primary-ap-southeast-2-093,10.252.74.79,Ubuntu 22.04,8,32,database_primary,ap-southeast-2
+api-gateway-ap-southeast-2-094,10.126.248.87,Ubuntu 22.04,8,32,api_gateway,ap-southeast-2
+api-gateway-ap-southeast-2-095,10.215.21.178,Amazon Linux 2,8,16,api_gateway,ap-southeast-2
+message-broker-us-east-1a-096,10.101.54.120,CentOS 8,32,128,message_broker,us-east-1a
+web-frontend-us-east-1b-097,10.190.161.27,CentOS 8,8,16,web_frontend,us-east-1b
+worker-node-eu-central-1-098,10.5.48.195,Debian 11,64,256,worker_node,eu-central-1
+database-primary-eu-central-1-099,10.62.47.44,Alpine Linux 3.14,8,32,database_primary,eu-central-1
+database-replica-us-east-1a-100,10.69.74.176,Amazon Linux 2,16,64,database_replica,us-east-1a
+cache-redis-ap-northeast-1-101,10.162.93.18,CentOS 8,4,8,cache_redis,ap-northeast-1
+worker-node-ap-southeast-2-102,10.144.23.170,CentOS 8,16,64,worker_node,ap-southeast-2
+message-broker-eu-central-1-103,10.171.236.236,Debian 11,4,16,message_broker,eu-central-1
+message-broker-us-east-1a-104,10.230.175.227,Ubuntu 22.04,64,256,message_broker,us-east-1a
+web-frontend-us-east-1a-105,10.74.127.3,CentOS 8,16,64,web_frontend,us-east-1a
+worker-node-ap-northeast-1-106,10.192.200.146,CentOS 8,32,64,worker_node,ap-northeast-1
+message-broker-us-east-1b-107,10.224.216.138,CentOS 8,64,256,message_broker,us-east-1b
+message-broker-ap-southeast-2-108,10.98.134.71,CentOS 8,4,16,message_broker,ap-southeast-2
+message-broker-us-east-1b-109,10.76.58.85,Amazon Linux 2,8,16,message_broker,us-east-1b
+database-primary-ap-southeast-2-110,10.69.251.36,Amazon Linux 2,64,256,database_primary,ap-southeast-2
+message-broker-us-east-1a-111,10.89.13.231,Debian 11,64,128,message_broker,us-east-1a
+worker-node-ap-northeast-1-112,10.175.53.190,CentOS 8,16,32,worker_node,ap-northeast-1
+web-frontend-ap-northeast-1-113,10.134.221.145,CentOS 8,32,128,web_frontend,ap-northeast-1
+message-broker-ap-southeast-2-114,10.75.20.226,Alpine Linux 3.14,32,128,message_broker,ap-southeast-2
+database-replica-eu-central-1-115,10.45.79.90,Ubuntu 22.04,8,16,database_replica,eu-central-1
+web-frontend-ap-northeast-1-116,10.175.0.19,Alpine Linux 3.14,16,32,web_frontend,ap-northeast-1
+database-replica-ap-northeast-1-117,10.78.107.50,Ubuntu 22.04,8,32,database_replica,ap-northeast-1
+worker-node-ap-northeast-1-118,10.24.209.61,Debian 11,64,128,worker_node,ap-northeast-1
+cache-redis-us-east-1a-119,10.8.142.153,Ubuntu 22.04,4,16,cache_redis,us-east-1a
+cache-redis-ap-northeast-1-120,10.203.46.121,CentOS 8,4,16,cache_redis,ap-northeast-1
+database-primary-us-east-1a-121,10.17.247.117,Debian 11,8,32,database_primary,us-east-1a
+database-replica-ap-southeast-2-122,10.27.214.85,CentOS 8,32,128,database_replica,ap-southeast-2
+api-gateway-us-east-1a-123,10.184.161.196,Debian 11,16,64,api_gateway,us-east-1a
+worker-node-us-east-1b-124,10.182.160.163,Ubuntu 22.04,16,32,worker_node,us-east-1b
+database-replica-eu-central-1-125,10.59.179.186,Ubuntu 22.04,32,64,database_replica,eu-central-1
+api-gateway-us-east-1b-126,10.58.122.17,Debian 11,16,64,api_gateway,us-east-1b
+worker-node-us-east-1a-127,10.163.194.28,Amazon Linux 2,64,256,worker_node,us-east-1a
+message-broker-eu-central-1-128,10.63.194.26,CentOS 8,32,128,message_broker,eu-central-1
+api-gateway-ap-northeast-1-129,10.221.176.132,Amazon Linux 2,16,32,api_gateway,ap-northeast-1
+web-frontend-us-east-1b-130,10.41.199.137,Debian 11,16,64,web_frontend,us-east-1b
+api-gateway-ap-southeast-2-131,10.200.154.67,Amazon Linux 2,8,32,api_gateway,ap-southeast-2
+worker-node-eu-central-1-132,10.1.244.40,Alpine Linux 3.14,32,128,worker_node,eu-central-1
+database-primary-ap-northeast-1-133,10.225.83.160,Debian 11,8,16,database_primary,ap-northeast-1
+message-broker-eu-central-1-134,10.189.185.231,Alpine Linux 3.14,64,256,message_broker,eu-central-1
+api-gateway-us-east-1a-135,10.24.128.77,Alpine Linux 3.14,32,128,api_gateway,us-east-1a
+api-gateway-us-east-1b-136,10.1.126.238,Ubuntu 22.04,32,64,api_gateway,us-east-1b
+web-frontend-ap-northeast-1-137,10.47.195.171,Ubuntu 22.04,16,32,web_frontend,ap-northeast-1
+message-broker-us-east-1a-138,10.185.176.127,Ubuntu 22.04,8,32,message_broker,us-east-1a
+database-replica-ap-southeast-2-139,10.124.246.137,Debian 11,8,32,database_replica,ap-southeast-2
+api-gateway-us-east-1b-140,10.33.109.70,Alpine Linux 3.14,8,32,api_gateway,us-east-1b
+database-primary-ap-northeast-1-141,10.232.236.120,Alpine Linux 3.14,64,256,database_primary,ap-northeast-1
+database-primary-us-east-1b-142,10.228.59.196,Amazon Linux 2,64,256,database_primary,us-east-1b
+worker-node-us-east-1a-143,10.226.108.40,Amazon Linux 2,8,16,worker_node,us-east-1a
+database-replica-us-east-1a-144,10.139.251.99,Amazon Linux 2,32,64,database_replica,us-east-1a
+database-replica-ap-southeast-2-145,10.8.216.21,Debian 11,16,64,database_replica,ap-southeast-2
+worker-node-us-east-1b-146,10.134.125.44,Alpine Linux 3.14,8,16,worker_node,us-east-1b
+worker-node-ap-northeast-1-147,10.140.89.26,CentOS 8,16,64,worker_node,ap-northeast-1
+database-primary-us-east-1b-148,10.67.190.56,Ubuntu 22.04,64,128,database_primary,us-east-1b
+api-gateway-ap-northeast-1-149,10.29.48.227,Ubuntu 22.04,4,16,api_gateway,ap-northeast-1

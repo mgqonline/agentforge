@@ -1,0 +1,148 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AgentForge Enterprise AI Platform API",
+    "description": "AgentForge 企业级全栈大模型智能体接入契约规范 (OpenAPI 3.0)\n包含任务异步派发、SSE 实时打字机推流、状态机轨迹回读与多租户 Token 审计中心。",
+    "version": "2.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "本地生产网关"
+    },
+    {
+      "url": "http://localhost:8090",
+      "description": "第15章全栈协同闭环服务"
+    }
+  ],
+  "paths": {
+    "/api/tasks": {
+      "post": {
+        "summary": "提交并异步派发 Agent 任务",
+        "description": "接入层毫秒级落盘并返回 task_id，耗时推理交由后台 Worker 异步消费，杜绝网关 504 超时。",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["prompt"],
+                "properties": {
+                  "prompt": {
+                    "type": "string",
+                    "example": "分析 2026 年大模型工程化落地与 Agent 架构趋势"
+                  },
+                  "user_id": {
+                    "type": "string",
+                    "example": "enterprise_architect_01"
+                  },
+                  "tenant_id": {
+                    "type": "string",
+                    "example": "tenant_corp_alpha"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "任务成功接收入库",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "task_id": { "type": "string", "example": "867f9723-fbb4-43c6-874f-cb9d5eeb4f7f" },
+                    "status": { "type": "string", "example": "PENDING" },
+                    "message": { "type": "string", "example": "任务已成功入库，后台 Agent 正在异步推理中" }
+                  }
+                }
+              }
+            }
+          },
+          "429": { "description": "触发租户 QPS 限流" }
+        }
+      }
+    },
+    "/api/tasks/{task_id}": {
+      "get": {
+        "summary": "查询任务状态、执行轨迹与 Token 账单",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "任务详情与步骤快照",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "task_id": { "type": "string" },
+                    "status": { "type": "string", "enum": ["PENDING", "RUNNING", "COMPLETED", "FAILED"] },
+                    "result": { "type": "string" },
+                    "total_tokens": { "type": "integer" },
+                    "duration_seconds": { "type": "number" },
+                    "steps": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "step_name": { "type": "string" },
+                          "thought": { "type": "string" },
+                          "action": { "type": "string" },
+                          "observation": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "任务未找到" }
+        }
+      }
+    },
+    "/api/tasks/{task_id}/stream": {
+      "get": {
+        "summary": "SSE 实时打字机流式订阅",
+        "description": "通过 Server-Sent Events (SSE) 逐字推流 Agent 状态机多阶段思考事件与结果增量。",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE 流式事件流",
+            "content": {
+              "text/event-stream": {
+                "schema": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

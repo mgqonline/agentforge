@@ -1,0 +1,59 @@
+# 核心 Web 框架与网络服务
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+websockets>=13.0
+httpx>=0.27.0
+httpx-sse>=0.4.0
+pydantic>=2.8.0
+pydantic-settings>=2.4.0
+python-dotenv>=1.0.0
+python-multipart>=0.0.9
+
+# 大模型与 Agent 编排体系
+openai>=1.40.0
+langchain>=0.2.14
+langchain-core>=0.2.33
+langchain-community>=0.2.12
+langchain-openai>=0.1.22
+langgraph>=0.2.14
+langchain-huggingface>=0.1.2
+langchain-mcp-adapters>=0.1.0
+tiktoken>=0.7.0
+mcp>=1.0.0
+
+# 向量数据库与检索增强 (Hybrid RAG)
+torch==2.5.1
+chromadb>=0.5.5
+langchain-chroma>=0.1.4
+sentence-transformers>=3.0.0
+rank-bm25>=0.2.2
+jieba>=0.42.1
+modelscope>=1.16.0
+
+# 关系数据库与持久化
+SQLAlchemy>=2.0.30
+pymysql>=1.1.1
+asyncpg>=0.29.0
+psycopg2-binary>=2.9.9
+psycopg[binary]>=3.2.0
+
+# 缓存与异步队列
+redis>=5.0.8
+celery>=5.4.0
+
+# 认证与安全风控
+cryptography>=43.0.0
+PyJWT>=2.9.0
+
+# 多模态与视觉识别
+opencv-python-headless>=4.10.0
+easyocr>=1.7.1
+faster-whisper>=1.0.3
+deepface>=0.0.93
+
+# 文档解析引擎 (Document Processor)
+PyMuPDF>=1.24.0
+python-docx>=1.1.0
+openpyxl>=3.1.0
+pandas>=2.2.0
+python-pptx>=0.6.23

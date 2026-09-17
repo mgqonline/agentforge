@@ -1,0 +1,164 @@
+[
+  {
+    "id": "doc_379209440",
+    "content": "ResNet（残差网络）是由微软研究院何恺明等人于2015年提出的深度神经网络架构。其核心创新是残差连接（Skip Connection），允许梯度直接跨层传播，成功训练了超过100层的深度网络。ResNet-50在ImageNet数据集上达到了76.1%的Top-1准确率，成为计算机视觉领域最广泛使用的骨干网络（Backbone）之一。",
+    "metadata": {
+      "category": "深度学习",
+      "topic": "ResNet",
+      "year": 2015
+    }
+  },
+  {
+    "id": "doc_4160173476",
+    "content": "Vision Transformer（ViT）是Google在2020年提出的将Transformer架构应用于图像识别的模型。ViT将图像切分为固定大小的Patch（图像块），然后将这些Patch序列化后输入Transformer编码器。在大规模数据集（JFT-300M）预训练后，ViT在ImageNet上超越了ResNet，达到88.55%的Top-1准确率。但ViT对数据量需求极大，小数据集上效果不如CNN。",
+    "metadata": {
+      "category": "深度学习",
+      "topic": "ViT",
+      "year": 2020
+    }
+  },
+  {
+    "id": "doc_9642887790",
+    "content": "YOLO（You Only Look Once）是一种实时目标检测算法，由Joseph Redmon在2016年首次提出。与两阶段检测器（如Faster R-CNN）不同，YOLO将目标检测视为回归问题，在单次前向传播中同时预测边界框和类别概率，速度极快。YOLOv8是目前最流行的版本，由Ultralytics公司维护，支持检测、分割、分类和姿态估计多种任务。",
+    "metadata": {
+      "category": "目标检测",
+      "topic": "YOLO",
+      "year": 2023
+    }
+  },
+  {
+    "id": "doc_7760282309",
+    "content": "BM25（Best Match 25）是信息检索领域最经典的关键字排序算法。它基于TF-IDF改进，引入了词频饱和处理（防止词语堆砌）和文档长度归一化两项关键优化。Elasticsearch默认使用BM25作为全文检索的相关性评分算法。BM25对精确关键字匹配效果极佳，但无法理解语义，例如无法识别同义词汽车和轿车是相近概念。",
+    "metadata": {
+      "category": "信息检索",
+      "topic": "BM25",
+      "year": 1994
+    }
+  },
+  {
+    "id": "doc_2944927334",
+    "content": "向量检索（Vector Search）也称语义检索，是指将文本、图像等非结构化数据通过Embedding模型转化为高维向量，然后通过近似最近邻（ANN）算法在向量空间中找到语义最相近的结果。常见的ANN算法包括HNSW（分层导航小世界）、IVF（倒排文件索引）和PQ（乘积量化）。HNSW是目前召回率和速度综合最优的算法，被ChromaDB、Qdrant等向量数据库广泛采用。",
+    "metadata": {
+      "category": "向量检索",
+      "topic": "ANN",
+      "year": 2023
+    }
+  },
+  {
+    "id": "doc_5336401220",
+    "content": "RAG（Retrieval-Augmented Generation，检索增强生成）是一种将大语言模型与知识库检索相结合的技术范式。RAG的核心流程是：用户提出问题，在知识库中检索相关文档，将检索到的文档作为上下文输入给LLM，LLM基于上下文生成准确答案。RAG能有效解决LLM的知识截止和幻觉问题，是目前企业知识库问答的主流技术方案。",
+    "metadata": {
+      "category": "RAG",
+      "topic": "检索增强生成",
+      "year": 2020
+    }
+  },
+  {
+    "id": "doc_3693802225",
+    "content": "混合检索（Hybrid Search）结合了关键字检索（BM25）和向量语义检索的优势。BM25擅长精确词汇匹配，向量检索擅长语义理解。两者通过倒数排名融合（RRF, Reciprocal Rank Fusion）算法合并排序结果，取长补短，通常比单一检索方式的召回率和精确率都要高10%到30%。工业界的高质量RAG系统基本都采用混合检索策略。",
+    "metadata": {
+      "category": "RAG",
+      "topic": "混合检索",
+      "year": 2023
+    }
+  },
+  {
+    "id": "doc_1552788655",
+    "content": "重排序（Reranking）是RAG系统的第三阶段，使用CrossEncoder（交叉编码器）对初步检索的候选文档进行精细打分。不同于双塔模型（Bi-Encoder）分别对问题和文档独立编码，CrossEncoder将问题和文档拼接后一起输入模型，能捕捉两者之间更细粒度的交互关系，打分精度远高于向量相似度。代表性模型包括BGE-Reranker和ms-marco系列。",
+    "metadata": {
+      "category": "RAG",
+      "topic": "重排序",
+      "year": 2023
+    }
+  },
+  {
+    "id": "doc_7919577342",
+    "content": "Transformer架构由Google在2017年的论文《Attention Is All You Need》中提出，彻底革命了自然语言处理领域。Transformer放弃了RNN的顺序计算，完全基于自注意力机制（Self-Attention），能够并行处理序列数据。它是BERT、GPT、LLaMA等几乎所有现代大语言模型的基础架构。",
+    "metadata": {
+      "category": "LLM",
+      "topic": "Transformer",
+      "year": 2017
+    }
+  },
+  {
+    "id": "doc_7136676966",
+    "content": "DeepSeek是由深度求索公司开发的大语言模型系列，以极低的训练成本取得了与GPT-4相当的性能而引发全球关注。DeepSeek-V3使用了MoE（混合专家）架构和MLA（多头潜注意力）机制，训练成本仅约600万美元。DeepSeek的API完全兼容OpenAI接口规范，可以直接替换OpenAI SDK使用，非常适合国内开发者。",
+    "metadata": {
+      "category": "LLM",
+      "topic": "DeepSeek",
+      "year": 2024
+    }
+  },
+  {
+    "id": "doc_4808370691",
+    "content": "Function Calling（函数调用）是大语言模型的重要能力，允许LLM在对话过程中决定何时调用外部工具函数，并生成符合函数签名的结构化参数。开发者只需用JSON Schema描述可用函数，LLM会自动判断是否调用及如何传参。这是构建AI Agent的核心技术，使模型能够查询数据库、调用API、执行代码等。",
+    "metadata": {
+      "category": "LLM",
+      "topic": "Function Calling",
+      "year": 2023
+    }
+  },
+  {
+    "id": "doc_6652615357",
+    "content": "TensorRT是NVIDIA推出的深度学习推理优化引擎，可将PyTorch、ONNX等框架的模型编译优化为高效的CUDA运行时。TensorRT支持FP16和INT8量化，能在保持精度损失极小的情况下将推理速度提升3到10倍，显著降低部署成本。它是自动驾驶、工业视觉等对实时性要求极高场景的首选部署方案。",
+    "metadata": {
+      "category": "模型部署",
+      "topic": "TensorRT",
+      "year": 2023
+    }
+  },
+  {
+    "id": "doc_6318352329",
+    "content": "模型量化（Model Quantization）是将神经网络的权重和激活值从高精度浮点数（FP32）压缩为低精度表示（FP16、INT8、INT4）的技术。量化能显著减少模型显存占用和推理延迟。训练后量化（PTQ）无需重新训练；量化感知训练（QAT）在训练过程中模拟量化误差，精度损失更小。INT4量化可让70B参数模型在单张消费级显卡上运行。",
+    "metadata": {
+      "category": "模型部署",
+      "topic": "量化",
+      "year": 2023
+    }
+  },
+  {
+    "id": "doc_7971490448",
+    "content": "LangGraph是LangChain团队开发的Agent编排框架，基于有向图（DAG）构建有状态的工作流。与线性链式调用不同，LangGraph支持循环、条件分支和多智能体协作，适合构建需要反思、规划和修正的复杂Agent系统。其核心概念包括State（全局状态）、Node（执行节点）、Edge（有条件的跳转边）。",
+    "metadata": {
+      "category": "Agent",
+      "topic": "LangGraph",
+      "year": 2024
+    }
+  },
+  {
+    "id": "doc_6082606399",
+    "content": "AutoGen是微软开源的多智能体框架，专注于构建多个AI Agent相互对话和协作的系统。AutoGen的核心组件包括AssistantAgent（由LLM驱动的助手）和UserProxyAgent（代理执行代码的用户代理）。多个Agent可以通过GroupChat进行轮询或动态路由协作，实现复杂任务的自动分工。",
+    "metadata": {
+      "category": "Agent",
+      "topic": "AutoGen",
+      "year": 2024
+    }
+  },
+  {
+    "id": "doc_6307547909",
+    "content": "MCP（Model Context Protocol，模型上下文协议）是Anthropic提出的开放标准协议，旨在统一AI大模型与外部数据源和工具之间的连接方式。MCP类似于AI世界的USB协议，只要工具按照MCP规范实现Server端，任何支持MCP的AI客户端（如Claude、AutoGen）都能即插即用地调用这些工具，无需为每个AI重写适配代码。",
+    "metadata": {
+      "category": "Agent",
+      "topic": "MCP",
+      "year": 2024
+    }
+  },
+  {
+    "id": "doc_8648712001",
+    "content": "CUDA（Compute Unified Device Architecture）是NVIDIA开发的并行计算平台和编程模型，允许开发者使用C++扩展编写在GPU上运行的并行程序。CUDA的核心概念包括：Kernel（在GPU上并行执行的函数）、Thread/Block/Grid（三级并行层次结构）、Shared Memory（同一Block内线程共享的高速缓存）。熟练使用CUDA是深度学习算子优化工程师的核心竞争力。",
+    "metadata": {
+      "category": "CUDA",
+      "topic": "CUDA基础",
+      "year": 2023
+    }
+  },
+  {
+    "id": "doc_1363386696",
+    "content": "Tensor Core是NVIDIA从Volta架构（V100）开始引入的专用矩阵计算单元，专门加速混合精度的矩阵乘法运算（GEMM）。Tensor Core是深度学习训练和推理加速的核心硬件，A100 GPU的Tensor Core理论峰值性能达到312 TFLOPS（FP16）。在自定义CUDA算子开发中，通过wmma接口或直接使用cuBLAS库可以调用Tensor Core。",
+    "metadata": {
+      "category": "CUDA",
+      "topic": "Tensor Core",
+      "year": 2023
+    }
+  }
+]

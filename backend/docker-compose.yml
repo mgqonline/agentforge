@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: ailearning_postgres
+    environment:
+      POSTGRES_USER: aiuser
+      POSTGRES_PASSWORD: aipassword
+      POSTGRES_DB: ailearning
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: ailearning_redis
+    ports:
+      - "6379:6379"
+
+  celery_worker:
+    build: .
+    container_name: ailearning_celery_worker
+    command: celery -A worker.celery_app worker --loglevel=info
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql+psycopg://aiuser:aipassword@postgres:5432/ailearning
+      - ASYNC_DATABASE_URL=postgresql+asyncpg://aiuser:aipassword@postgres:5432/ailearning
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_BASE=${OPENAI_API_BASE}
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      - .:/app
+
+volumes:
+  postgres_data:

@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+#
+# Ailearning 提交流程安全与架构规范守门 Hook
+# 自动拦截 API Key 泄露、前端端口硬编码及沙箱安全回归失败
+#
+
+set -e
+
+echo "🔍 [Git Hook] 正在执行提交前安全边界与工程规范审查..."
+
+# 1. 检测是否包含真实敏感凭证 (排除测试用例与规则定义文件)
+STAGED_DIFF=$(git diff --cached -U0 -- ':!backend/test_sandbox_security.py' ':!*.md')
+if echo "$STAGED_DIFF" | grep -E "^\+[ ]*(sk-[a-zA-Z0-9]{32,}|ghp_[a-zA-Z0-9]{36,}|AIzaSy[a-zA-Z0-9_-]{33})" > /dev/null; then
+    echo "❌ [安全拦截] 检测到暂存区代码包含真实 API Key / Token 凭据特征！"
+    echo "请使用环境变量或脱敏配置，切勿将敏感凭据提交至版本库。"
+    exit 1
+fi
+
+# 2. 检测前端是否硬编码后端端口 (必须使用相对路径如 /api/...)
+FRONTEND_STAGED=$(git diff --cached -U0 -- 'frontend-react/src/*' ':!frontend-react/src/setupProxy.js')
+if echo "$FRONTEND_STAGED" | grep -E "^\+.*(http://localhost:600[0-9]|http://127.0.0.1:600[0-9])" > /dev/null; then
+    echo "❌ [规范拦截] 检测到前端代码中硬编码了后端端口 (如 http://localhost:6001)！"
+    echo "请使用相对路径 (如 /api/v1/...) 或统一配置，以确保容器与生产环境正常转发。"
+    exit 1
+fi
+
+# 3. 如果修改了后端沙箱相关文件，执行安全红线自动化测试
+BACKEND_CHANGED=$(git diff --cached --name-only | grep -E "^backend/(sandbox_runner|curriculum_engine)\.py" || true)
+if [ -n "$BACKEND_CHANGED" ]; then
+    echo "🧪 [自动化测试] 检测到沙箱核心模块变更，正在执行安全回归测试套件..."
+    if command -v pytest > /dev/null; then
+        pytest backend/test_sandbox_security.py backend/test_curriculum_sandbox.py -q
+        echo "✅ [自动化测试] 沙箱安全测试全数通过！"
+    else
+        echo "⚠️ 未检测到本地 pytest，跳过本地测试 (请确保容器或 CI 环境已通过)。"
+    fi
+fi
+
+echo "✅ [Git Hook] 安全与规范校验通过，准予提交。"
+exit 0

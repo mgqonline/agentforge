@@ -1,0 +1,56 @@
+# ==============================================================================
+# DeepSeek Harness (DSH) 架构守护与不可偏离策略配置 (Architecture Governance)
+# 驱动框架: @deepseek-ai/deepseek-harness (Cordis Plugin Architecture)
+# 核心目标: 防御架构漂移、杜绝未授权文件/DB变更、实施人机安全审批闭环
+# ==============================================================================
+
+version: "1.0"
+profile: "enterprise-agent"
+
+# 1. 模型分层调度与适配器
+llm:
+  provider: "deepseek"
+  base_url: "${OPENAI_API_BASE:-https://api.deepseek.com}"
+  api_key: "${OPENAI_API_KEY}"
+  models:
+    research: "deepseek-reasoner"   # 用于深度推演、方案论证与架构防偏离评估 (R1)
+    production: "deepseek-chat"     # 用于常规业务代码生成与工具执行 (V3.2)
+
+# 2. 工具调用与展示模式约束 (Programmatic Tool Calling / PTC)
+tools:
+  presentation_mode: "both"        # 采用原生 + PTC (run_code) 双模约束
+  max_parallel_sub_calls: 5        # 最大并发子调用上限，防止算力击穿
+  timeout_seconds: 60
+
+# 3. 架构防偏离拦截规则 (Event-driven Interceptors)
+governance:
+  # 文件系统读写防护白名单与黑名单
+  fs_policy:
+    protected_paths:
+      - "backend/main.py"
+      - "backend/orchestrator_graph.py"
+      - "backend/agent_governance.py"
+      - "docker-compose.yml"
+      - ".env"
+    require_approval_on_edit: true
+    audit_log_path: "logs/dsh_fs_audit.jsonl"
+
+  # 审批门禁策略 (Approval Policy)
+  approval_policy:
+    high_risk_actions:
+      - "db_drop"
+      - "db_alter"
+      - "file_delete"
+      - "shell_exec_sudo"
+    require_human_in_the_loop: true
+    auto_reject_untrusted: true
+
+  # 架构一致性校验门禁 (Architecture Gatekeeper)
+  drift_detection:
+    enforce_layering: true         # 强制保持 前端 -> 网关 -> 后端 -> 基础设施 分层
+    allowed_ports:
+      frontend: 6000
+      backend: 6001
+      postgres: 5432
+      redis: 6379
+    block_port_deviations: true

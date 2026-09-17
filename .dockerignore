@@ -1,0 +1,12 @@
+venv/
+.venv/
+**/node_modules/
+**/.git/
+**/.DS_Store
+**/*.log
+**/*.pyc
+**/__pycache__/
+.cache/
+.pytest_cache/
+frontend/dist/
+frontend-react/dist/

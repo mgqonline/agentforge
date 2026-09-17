@@ -1,0 +1,37 @@
+System Architecture and Incident Response Playbook
+=================================================
+
+Overview
+This document outlines the high-level architecture of our global payment gateway platform and the standard operating procedures for critical incidents.
+
+Core Services
+1. Transaction API (Node.js/Express)
+The Transaction API is the main entry point for all incoming payment requests. It performs schema validation using Zod and forwards the validated payloads to the message broker.
+
+2. Message Broker (Apache Kafka)
+We use a 5-node Kafka cluster (version 3.4) to buffer incoming requests. The topics are partitioned by merchant ID to ensure strict ordering of transactions for a single merchant.
+
+3. Payment Processor (Golang)
+The Go workers consume messages from Kafka, interact with external banking APIs (Stripe, PayPal, Adyen), and persist the final state into PostgreSQL. Go was chosen for its high concurrency throughput using goroutines.
+
+4. Caching Layer (Redis Cluster)
+A Redis cluster is used to cache merchant configurations, API keys, and rate-limiting counters.
+
+Incident Response: Database Failover
+In the event of a primary PostgreSQL failure, the PgBouncer connection pool will automatically pause incoming requests. The Patroni daemon will promote the most up-to-date replica to primary. 
+Engineers must verify the promotion by checking the `/patroni` API endpoint and monitoring the Grafana dashboard for replication lag.
+
+Appendix 1: Historical Outage 2020-08
+During the incident, the API latency spiked to 2658ms due to a bottleneck in the Kafka producer. The team resolved this by scaling the deployment from 16 pods to 32 pods via Kubernetes HPA.
+
+Appendix 2: Historical Outage 2021-08
+During the incident, the API latency spiked to 4711ms due to a bottleneck in the Postgres index. The team resolved this by scaling the deployment from 10 pods to 35 pods via Kubernetes HPA.
+
+Appendix 3: Historical Outage 2022-04
+During the incident, the API latency spiked to 2986ms due to a bottleneck in the Go workers. The team resolved this by scaling the deployment from 20 pods to 42 pods via Kubernetes HPA.
+
+Appendix 4: Historical Outage 2023-02
+During the incident, the API latency spiked to 2774ms due to a bottleneck in the Postgres index. The team resolved this by scaling the deployment from 14 pods to 35 pods via Kubernetes HPA.
+
+Appendix 5: Historical Outage 2024-01
+During the incident, the API latency spiked to 3466ms due to a bottleneck in the Go workers. The team resolved this by scaling the deployment from 18 pods to 46 pods via Kubernetes HPA.

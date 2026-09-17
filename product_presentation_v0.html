@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="zh">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgentForge · 智炼工坊 - 产品设计初衷、技术架构与业务价值深度演讲</title>
+    
+    <!-- Reveal.js 核心样式 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reset.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --bg-deep: #0a0d14;
+            --bg-card: rgba(18, 24, 38, 0.78);
+            --border-glow: rgba(56, 189, 248, 0.25);
+            --border-light: rgba(255, 255, 255, 0.08);
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+            --cyan-glow: #38bdf8;
+            --purple-glow: #818cf8;
+            --emerald-glow: #34d399;
+            --amber-glow: #fbbf24;
+            --rose-glow: #f43f5e;
+            --font-ui: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-code: 'JetBrains Mono', monospace;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            font-family: var(--font-ui);
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        /* 沉浸式动态深色光晕 */
+        .ambient-bg {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            pointer-events: none;
+            z-index: -1;
+            background:
+                radial-gradient(circle at 10% 15%, rgba(56, 189, 248, 0.12) 0%, transparent 45%),
+                radial-gradient(circle at 90% 85%, rgba(129, 140, 248, 0.12) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.9) 0%, #06080e 100%);
+        }
+
+        .reveal {
+            font-family: var(--font-ui);
+            font-size: 25px;
+            color: var(--text-main);
+        }
+
+        .reveal h1, .reveal h2, .reveal h3, .reveal h4 {
+            font-family: var(--font-ui);
+            color: #ffffff;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            text-transform: none;
+            margin-bottom: 16px;
+        }
+
+        .reveal h1 { font-size: 2.3em; line-height: 1.15; }
+        .reveal h2 { font-size: 1.65em; }
+        .reveal h3 { font-size: 1.25em; }
+
+        /* 渐变标题特效 */
+        .gradient-text {
+            background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: inline-block;
+        }
+
+        .gradient-gold {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .gradient-emerald {
+            background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .gradient-rose {
+            background: linear-gradient(135deg, #f43f5e 0%, #fb7185 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* 磨砂玻璃卡片 */
+        .glass-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-light);
+            border-radius: 14px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            text-align: left;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-card:hover {
+            border-color: var(--border-glow);
+            transform: translateY(-2px);
+        }
+
+        /* 标签徽章 */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.72em;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+        }
+        .badge-cyan { background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+        .badge-purple { background: rgba(129, 140, 248, 0.12); color: #818cf8; border: 1px solid rgba(129, 140, 248, 0.3); }
+        .badge-emerald { background: rgba(52, 211, 153, 0.12); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3); }
+        .badge-amber { background: rgba(251, 191, 36, 0.12); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3); }
+        .badge-rose { background: rgba(244, 63, 94, 0.12); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.3); }
+
+        /* 网格布局 */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+
+        /* 强调代码高亮 */
+        .code-pill {
+            font-family: var(--font-code);
+            background: rgba(0, 0, 0, 0.4);
+            padding: 2px 7px;
+            border-radius: 5px;
+            color: #38bdf8;
+            font-size: 0.85em;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* 进度条与控制器定制 */
+        .reveal .progress { height: 4px; color: var(--cyan-glow); }
+        .reveal .controls button { color: var(--cyan-glow); }
+
+        /* 引导清单列表 */
+        .step-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .step-list li {
+            position: relative;
+            padding-left: 32px;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+        .step-list li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 22px;
+            height: 22px;
+            background: rgba(56, 189, 248, 0.2);
+            color: #38bdf8;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        /* 动画过渡与呼吸效果 */
+        .pulse-box {
+            animation: subtle-pulse 3s infinite alternate;
+        }
+        @keyframes subtle-pulse {
+            0% { box-shadow: 0 0 15px rgba(56, 189, 248, 0.1); }
+            100% { box-shadow: 0 0 30px rgba(56, 189, 248, 0.28); }
+        }
+
+        /* 底部导航提示 */
+        .footer-tip {
+            position: fixed;
+            bottom: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.35);
+            pointer-events: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ambient-bg"></div>
+    <div class="footer-tip">按空格键 [Space] 或方向键 [→] 步入下一篇章</div>
+
+    <div class="reveal">
+        <div class="slides">
+
+            <!-- ==========================================
+                 SLIDE 1: 震撼封面与产品愿景
+                 ========================================== -->
+            <section data-auto-animate>
+                <div class="badge badge-cyan">
+                    <i class="fa-solid fa-cube"></i> Enterprise AI Architecture & Business Platform
+                </div>
+                <h1 style="margin-top: 8px;">
+                    ⚡ <span class="gradient-text">AgentForge · 智炼工坊</span>
+                </h1>
+                <h3 style="color: var(--text-sub); font-weight: 400; margin-bottom: 24px; font-size: 1.15em;">
+                    设计初衷 · 工业级技术架构 · 企业核心业务价值全景
+                </h3>
+                
+                <div class="glass-card pulse-box" style="max-width: 860px; margin: 0 auto; text-align: center; padding: 18px 28px;">
+                    <p style="margin: 0; font-size: 0.9em; color: #cbd5e1; line-height: 1.6;">
+                        🎯 <strong>核心使命</strong>：<strong>把复杂的 AI 工程简单化、产品化</strong>。<br>
+                        移走传统工程师面临的环境与心智摩擦，打造从<strong>“单机玩具 Demo”</strong>通向<strong>“高抗击工业生产系统”</strong>的确定性桥梁。
+                    </p>
+                </div>
+
+                <div style="margin-top: 26px; display: flex; justify-content: center; gap: 28px; font-size: 0.78em; color: var(--text-sub);">
+                    <span><i class="fa-solid fa-diagram-project" style="color:#818cf8;"></i> LangGraph 状态机</span>
+                    <span><i class="fa-solid fa-bolt" style="color:#fbbf24;"></i> FastAPI + Celery 铁三角</span>
+                    <span><i class="fa-solid fa-shield-halved" style="color:#34d399;"></i> 多租户 RBAC & 安全沙箱</span>
+                    <span><i class="fa-solid fa-chart-line" style="color:#38bdf8;"></i> 80% 研发提效 & 成本治理</span>
+                </div>
+            </section>
+
+            <!-- ==========================================
+                 SLIDE 2: 设计初衷：大模型很火，但大家都在“过家家”
+                 ========================================== -->
+            <section data-auto-animate>
+                <div class="badge badge-rose">
+                    <i class="fa-solid fa-triangle-exclamation"></i> 诞生初衷 · 行业残酷真相
+                </div>
+                <h2>大模型很火，但为什么大家都在“过家家”？</h2>
+                <p style="color: var(--text-sub); font-size: 0.82em;">调几行 API 控制台打印聊天只是脆弱的玩具，真正的企业级深水区面临五大工程泥潭。</p>
+
+                <div class="grid-2" style="margin-top: 16px;">
+                    <div class="glass-card" style="border-left: 4px solid #f43f5e;">
+                        <h4 style="color: #f43f5e; margin-bottom: 12px;"><i class="fa-solid fa-bug"></i> 原型陷阱：玩具级 Demo（传统教程）</h4>
+                        <ul class="step-list" style="font-size: 0.76em; color: #cbd5e1;">
+                            <li><strong>接口 504 崩溃</strong>：多 Agent 思考运行 2 分钟，HTTP 线程长挂网关超时</li>
+                            <li><strong>并发 429 雪崩</strong>：外部商业 API 稍有并发立刻抛出限流异常，程序挂死</li>
+                            <li><strong>断电记忆全丢</strong>：原生内存列表保存历史，进程重启用户对话灰飞烟灭</li>
+                            <li><strong>高危越权失控</strong>：给 AI 工具调用权限，一不小心可能把生产库表全部误删</li>
+                            <li><strong>财务无法对账</strong>：不知道每次任务消耗了多少 Token，成本完全黑盒</li>
+                        </ul>
+                    </div>
+
+                    <div class="glass-card" style="border-left: 4px solid #34d399;">
+                        <h4 style="color: #34d399; margin-bottom: 12px;"><i class="fa-solid fa-shield-halved"></i> 生产护城河：工业级底座（AgentForge 解法）</h4>
+                        <ul class="step-list" style="font-size: 0.76em; color: #cbd5e1;">
+                            <li><strong>FastAPI + Celery</strong>：接入层 5ms 返回 task_id，异步 Worker 稳健消费</li>
+                            <li><strong>自适应指数退避</strong>：Celery 配置 <span class="code-pill">countdown=2^n</span> 重试，平滑避开并发洪峰</li>
+                            <li><strong>SQLAlchemy 状态落盘</strong>：每一步思考轨迹自动落库 Checkpoint，支持续跑</li>
+                            <li><strong>HITL 人机协同审批</strong>：高危操作必须人类在 Web 界面点击“同意”才放行</li>
+                            <li><strong>多租户动态记账</strong>：精确累加 Token 消耗与执行时长，支持企业配额分账</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==========================================
+                 SLIDE 3: 传统工程师转型的“四座大山”
+                 ========================================== -->
+            <section data-auto-animate>
+                <div class="badge badge-amber">
+                    <i class="fa-solid fa-mountain"></i> 转型阻碍剖析
+                </div>
+                <h2>传统工程师转型 AI 全栈的“四座大山”</h2>
+                <p style="color: var(--text-sub); font-size: 0.82em;">写 Java/Go/前端的资深工程师并非缺乏技术追求，而是被层出不穷的“非业务杂质”劝退。</p>
+
+                <div class="grid-4" style="margin-top: 18px;">
+                    <div class="glass-card" style="padding: 16px;">
+                        <div style="font-size: 1.8em; color: #fbbf24; margin-bottom: 8px;"><i class="fa-solid fa-microchip"></i></div>
+                        <h4 style="font-size: 0.92em; margin-bottom: 6px;">1. 显卡环境地狱</h4>
+                        <p style="font-size: 0.72em; color: var(--text-sub); line-height: 1.45;">
+                            配环境 3 天，代码跑 3 秒。CUDA 驱动冲突、PyTorch 编译错，门槛高不可攀。
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 16px;">
+                        <div style="font-size: 1.8em; color: #f43f5e; margin-bottom: 8px;"><i class="fa-solid fa-credit-card"></i></div>
+                        <h4 style="font-size: 0.92em; margin-bottom: 6px;">2. 海外 API 高墙</h4>
+                        <p style="font-size: 0.72em; color: var(--text-sub); line-height: 1.45;">
+                            教程强依赖境外 API 与海外信用卡，调用费用高昂，动辄封号被拒之门外。
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 16px;">
+                        <div style="font-size: 1.8em; color: #818cf8; margin-bottom: 8px;"><i class="fa-solid fa-book-skull"></i></div>
+                        <h4 style="font-size: 0.92em; margin-bottom: 6px;">3. 学术公式恐吓</h4>
+                        <p style="font-size: 0.72em; color: var(--text-sub); line-height: 1.45;">
+                            一打开书本就是复杂的反向传播矩阵与偏导数，脱离了企业真实工程架构本质。
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 16px;">
+                        <div style="font-size: 1.8em; color: #38bdf8; margin-bottom: 8px;"><i class="fa-solid fa-puzzle-piece"></i></div>
+                        <h4 style="font-size: 0.92em; margin-bottom: 6px;">4. 碎片代码拼图</h4>
+                        <p style="font-size: 0.72em; color: var(--text-sub); line-height: 1.45;">
+                            满网都是缺导包、少变量的单行脚本，学完依然不知道怎么搭一套生产应用。
+                        </p>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px; padding: 10px 18px; background: rgba(56, 189, 248, 0.08); border-radius: 8px; border: 1px dashed rgba(56, 189, 248, 0.3); font-size: 0.78em; color: #cbd5e1; text-align: center;">
+                    💡 <strong>AgentForge 初衷</strong>：用确定性的软件工程架构，包裹非确定性的大模型业务，让人人都能零门槛上手。
+                </div>
+            </section>
+
+            <!-- ==========================================
+                 SLIDE 4: 核心破局之道：“三层屏蔽”自闭环架构
+                 ========================================== -->
+            <section data-auto-animate>
+                <div class="badge badge-cyan">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> 破局之道 · [设计哲学] “三层屏蔽”机制
+                </div>
+                <h2>把环境地狱关进黑盒，把架构蓝图呈在眼前</h2>
+                <p style="color: var(--text-sub); font-size: 0.82em;">通过底层设计全自动消化外部摩擦，让工程师专注吸收 AI 架构核心思想。</p>
+
+                <div class="grid-3" style="margin-top: 24px;">
+                    <div class="glass-card" style="text-align: center; padding: 22px 18px;">
+                        <div class="badge badge-purple" style="font-size: 0.75em;">① 屏蔽外部 API 与费用</div>
+                        <h3 style="font-size: 1.05em; margin-top: 8px;">内置离线仿真与国产平替</h3>
+                        <p style="font-size: 0.75em; color: #cbd5e1; line-height: 1.6;">
+                            • 提供无需任何 Key 的 <span class="code-pill">Simulation</span> 模式，断网也能跑完整反思链路。<br>
+                            • 原生一行切换至国产 <strong>DeepSeek</strong> 或本地免费的 <strong>Ollama</strong>。
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="text-align: center; padding: 22px 18px;">
+                        <div class="badge badge-cyan" style="font-size: 0.75em;">② 屏蔽算力与硬件门槛</div>
+                        <h3 style="font-size: 1.05em; margin-top: 8px;">纯 CPU / MPS 轻量极速运行</h3>
+                        <p style="font-size: 0.75em; color: #cbd5e1; line-height: 1.6;">
+                            • 向量嵌入与特征提取全面集成 <strong>ONNX Runtime</strong>，单核 CPU 笔记本即可秒级推理。<br>
+                            • 深度适配 Mac Apple Silicon (MPS 硬件加速)。
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="text-align: center; padding: 22px 18px;">
+                        <div class="badge badge-emerald" style="font-size: 0.75em;">③ 屏蔽繁重中间件配置</div>
+                        <h3 style="font-size: 1.05em; margin-top: 8px;">单机轻量自洽 + 容器双模</h3>
+                        <p style="font-size: 0.75em; color: #cbd5e1; line-height: 1.6;">
+                            • 默认采用内嵌零安装的 <span class="code-pill">SQLite + aiosqlite</span>，即下即跑。<br>
+                            • 提供一键式 <span class="code-pill">deploy.sh / docker-compose</span>，秒级拉起企业级集群。
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==========================================
+                 SLIDE 5: 【重磅新增】企业核心业务价值与 ROI 矩阵
+                 ========================================== -->
+            <section data-auto-animate>
+                <div class="badge badge-emerald">
+                    <i class="fa-solid fa-chart-pie"></i> 商业收益 · ROI 全景
+                </div>
+                <h2>企业核心业务价值与商业回报 (Enterprise ROI)</h2>
+                <p style="color: var(--text-sub); font-size: 0.82em;">AgentForge 不止是练兵场，更是直接赋能企业降本增效与安全交付的生产母座。</p>
+
+                <div class="grid-4" style="margin-top: 18px;">
+                    <div class="glass-card" style="border-top: 3px solid #38bdf8; padding: 18px 14px;">
+                        <div style="font-size: 1.6em; color: #38bdf8; margin-bottom: 8px;"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                        <h4 style="font-size: 0.9em; margin-bottom: 6px; color: #f8fafc;">1. 交付周期压缩 80%</h4>
+                        <div class="badge badge-cyan" style="font-size: 0.65em; padding: 2px 8px; margin-bottom: 8px;">Time-to-Market</div>
+                        <p style="font-size: 0.72em; color: var(--text-sub); line-height: 1.45;">
+                            沉淀现成脚手架（RepoSense、Hybrid RAG、多格式文档解析器）。企业自研 Agent 从 <strong>2~3 个月压缩至 1~2 周</strong>，立项即上线。
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="border-top: 3px solid #fbbf24; padding: 18px 14px;">
+                        <div style="font-size: 1.6em; color: #fbbf24; margin-bottom: 8px;"><i class="fa-solid fa-coins"></i></div>
+                        <h4 style="font-size: 0.9em; margin-bottom: 6px; color: #f8fafc;">2. 降本增效 30%~60%</h4>
+                        <div class="badge badge-amber" style="font-size: 0.65em; padding: 2px 8px; margin-bottom: 8px;">Token Cost Control</div>
+                        <p style="font-size: 0.72em; color: var(--text-sub); line-height: 1.45;">
+                            内置多租户月度预算硬熔断；配合<strong>语义缓存 (Semantic Cache)</strong>，相似问题直接命中缓存，显著削减外部模型 API 账单。
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="border-top: 3px solid #34d399; padding: 18px 14px;">
+                        <div style="font-size: 1.6em; color: #34d399; margin-bottom: 8px;"><i class="fa-solid fa-shield-virus"></i></div>
+                        <h4 style="font-size: 0.9em; margin-bottom: 6px; color: #f8fafc;">3. 生产安全与合规避险</h4>
+                        <div class="badge badge-emerald" style="font-size: 0.65em; padding: 2px 8px; margin-bottom: 8px;">Zero Production Risk</div>
+                        <p style="font-size: 0.72em; color: var(--text-sub); line-height: 1.45;">
+                            <strong>HITL 审批流</strong>确保退款、改库高危动作必经人类确认；<strong>AST 静态审查沙箱</strong>彻底阻断注入提权与恶性删库脚本。
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="border-top: 3px solid #818cf8; padding: 18px 14px;">
+                        <div style="font-size: 1.6em; color: #818cf8; margin-bottom: 8px;"><i class="fa-solid fa-users-gear"></i></div>
+                        <h4 style="font-size: 0.9em; margin-bottom: 6px; color: #f8fafc;">4. 盘活存量技术资产</h4>
+                        <div class="badge badge-purple" style="font-size: 0.65em; padding: 2px 8px; margin-bottom: 8px;">Talent Transformation</div>
+                        <p style="font-size: 0.72em; color: var(--text-sub); line-height: 1.45;">
+                            无需高薪外聘算法博士。让企业内现有的 Java/Go/前端工程师低成本平滑转型，快速形成<strong>自主可控的 AI 原生研发梯队</strong>。
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==========================================
+                 SLIDE 6: 7天研发奇迹纪实
+                 ========================================== -->
+            <section data-auto-animate>
+                <div class="badge badge-amber">
+                    <i class="fa-solid fa-stopwatch"></i> 研发纪实 · 速度与激情
+                </div>
+                <h2>从构思到落地：7 天，我们如何实现极速突围？</h2>
+                <p style="color: var(--text-sub); font-size: 0.82em;">拒绝冗长空中楼阁，用敏捷特种作战的方式，在 7 天内跑通全套企业级架构。</p>
+
+                <div class="grid-4" style="margin-top: 20px;">
+                    <div class="glass-card" style="padding: 16px; border-top: 3px solid #fbbf24;">
+                        <span class="badge badge-amber" style="font-size: 0.65em; margin-bottom: 6px;">Day 1: 破壁立项</span>
+                        <h4 style="font-size: 0.88em; margin-bottom: 6px;">立项与哲学确立</h4>
+                        <p style="font-size: 0.72em; color: var(--text-sub); line-height: 1.45;">
+                            • 洞察玩具与生产断层<br>
+                            • 确立<strong>“三层屏蔽”</strong>原则<br>
+                            • 完成 24 阶段能力全景架构
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 16px; border-top: 3px solid #818cf8;">
+                        <span class="badge badge-purple" style="font-size: 0.65em; margin-bottom: 6px;">Day 2-3: 智能体中枢</span>
+                        <h4 style="font-size: 0.88em; margin-bottom: 6px;">认知与知识引擎</h4>
+                        <p style="font-size: 0.72em; color: var(--text-sub); line-height: 1.45;">
+                            • 攻克 Prompt / 工具协议 (MCP)<br>
+                            • 构建 <strong>Hybrid RAG</strong> 混合检索<br>
+                            • 引入 <strong>LangGraph</strong> 有状态循环图
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 16px; border-top: 3px solid #38bdf8;">
+                        <span class="badge badge-cyan" style="font-size: 0.65em; margin-bottom: 6px;">Day 4-5: 工程底座</span>
+                        <h4 style="font-size: 0.88em; margin-bottom: 6px;">全栈闭环突破</h4>
+                        <p style="font-size: 0.72em; color: var(--text-sub); line-height: 1.45;">
+                            • 解决 504 超时与 429 智能退避<br>
+                            • 落地异步 ORM 状态 Checkpoint<br>
+                            • 编写 <strong>15 章全栈协同系统</strong>
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 16px; border-top: 3px solid #34d399;">
+                        <span class="badge badge-emerald" style="font-size: 0.65em; margin-bottom: 6px;">Day 6-7: 双端合璧</span>
+                        <h4 style="font-size: 0.88em; margin-bottom: 6px;">Web 沙箱与产品化</h4>
+                        <p style="font-size: 0.72em; color: var(--text-sub); line-height: 1.45;">
+                            • 交付 React 沉浸台与 Monaco 沙箱<br>
+                            • 落地 SSE 打字机与 HITL 审批<br>
+                            • 双端口桥接与全链路压测交付
+                        </p>
+                    </div>
+                </div>
+
+                <div style="margin-top: 22px; padding: 10px 18px; background: rgba(56, 189, 248, 0.08); border-radius: 8px; border: 1px dashed rgba(56, 189, 248, 0.3); font-size: 0.76em; color: #cbd5e1; text-align: center;">
+                    ⚡ <strong>研发启示</strong>：7 天高效突围证明 —— 只要架构主线清晰、工程职责解耦，构建企业级 AI 生产系统绝非遥不可及！
+                </div>
+            </section>
+
+            <!-- ==========================================
+                 SLIDE 7: 全栈工程“铁三角”底座 (12-15 融汇贯通)
+                 ========================================== -->
+            <section data-auto-animate>
+                <div class="badge badge-emerald">
+                    <i class="fa-solid fa-server"></i> 生产底座 · 全栈工程“铁三角”
+                </div>
+                <h2>从“单机调包”到“企业生产级大串联”</h2>
+                <p style="color: var(--text-sub); font-size: 0.82em;">打通 12-FastAPI 网关 + 13-SQLAlchemy 持久化 + 14-Celery 异步队列 + 15-全栈协同！</p>
+
+                <div class="grid-4" style="margin-top: 20px;">
+                    <div class="glass-card" style="padding: 16px;">
+                        <span class="badge badge-cyan" style="font-size: 0.68em;">12 接口网关</span>
+                        <h4 style="font-size: 0.92em;">FastAPI 高性能网关</h4>
+                        <p style="font-size: 0.72em; color: var(--text-sub); line-height: 1.45;">
+                            • Lifespan 显存预热<br>
+                            • SSE 逐字打字机推流<br>
+                            • Depends 鉴权与耗时中间件
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 16px;">
+                        <span class="badge badge-purple" style="font-size: 0.68em;">13 数据持久</span>
+                        <h4 style="font-size: 0.92em;">SQLAlchemy 2.0 异步</h4>
+                        <p style="font-size: 0.72em; color: var(--text-sub); line-height: 1.45;">
+                            • Checkpoint 轨迹落盘<br>
+                            • Token 消耗与账单记账<br>
+                            • pool_pre_ping 探活防断链
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 16px;">
+                        <span class="badge badge-amber" style="font-size: 0.68em;">14 异步集群</span>
+                        <h4 style="font-size: 0.92em;">Celery 分布式调度</h4>
+                        <p style="font-size: 0.72em; color: var(--text-sub); line-height: 1.45;">
+                            • 任务解耦防 504 超时<br>
+                            • 429 自适应指数退避重试<br>
+                            • 多 Agent 并行 Chord 汇聚
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 16px; border: 1px solid var(--cyan-glow);">
+                        <span class="badge badge-emerald" style="font-size: 0.68em;">15 集大成闭环</span>
+                        <h4 style="font-size: 0.92em;">全栈架构协同实战</h4>
+                        <p style="font-size: 0.72em; color: #38bdf8; line-height: 1.45;">
+                            • 开箱即用端到端生产脚本<br>
+                            • 接入 → 落盘 → Worker → SSE 推流 → 回读闭环
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==========================================
+                 SLIDE 8: 【重磅新增】生产级多租户工作台与安全治理体验
+                 ========================================== -->
+            <section data-auto-animate>
+                <div class="badge badge-purple">
+                    <i class="fa-solid fa-user-shield"></i> 企业级中枢 · 治理与安全体验
+                </div>
+                <h2>现代多租户工作台与人机安全验证</h2>
+                <p style="color: var(--text-sub); font-size: 0.82em;">全新落地的企业级登录中枢、精细化多租户 RBAC 与交互式人机验证防刷机制。</p>
+
+                <div class="grid-3" style="margin-top: 20px;">
+                    <div class="glass-card" style="padding: 18px;">
+                        <div style="font-size: 1.6em; color: #fbbf24; margin-bottom: 8px;"><i class="fa-solid fa-users-viewfinder"></i></div>
+                        <h4 style="font-size: 0.92em; margin-bottom: 6px;">多租户 RBAC 权限隔离</h4>
+                        <p style="font-size: 0.74em; color: #cbd5e1; line-height: 1.5;">
+                            • <strong>超级管理员 (admin)</strong>：全局账单与最高执行权<br>
+                            • <strong>研发负责人 (dev_lead)</strong>：沙箱打靶与关卡演练<br>
+                            • <strong>算法科学家 (researcher)</strong>：独立算法实验室配额<br>
+                            • <strong>只读访客 (guest)</strong>：受限沙箱与安全拦截体验
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 18px;">
+                        <div style="font-size: 1.6em; color: #38bdf8; margin-bottom: 8px;"><i class="fa-solid fa-shapes"></i></div>
+                        <h4 style="font-size: 0.92em; margin-bottom: 6px;">几何图形人机验证 (Captcha)</h4>
+                        <p style="font-size: 0.74em; color: #cbd5e1; line-height: 1.5;">
+                            • 创新 <strong>SVG 动态几何图形尺寸识别</strong>（16px ~ 46px 明显尺寸阶梯），让用户判断选择最小图形。<br>
+                            • 选错抖动警示并 700ms 乱序重构防穷举；密码错误自动重置验证码，彻底防范撞库攻击。
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 18px;">
+                        <div style="font-size: 1.6em; color: #34d399; margin-bottom: 8px;"><i class="fa-solid fa-key"></i></div>
+                        <h4 style="font-size: 0.92em; margin-bottom: 6px;">极致体验与双端口通道</h4>
+                        <p style="font-size: 0.74em; color: #cbd5e1; line-height: 1.5;">
+                            • <strong>记住密码凭据自动持久化</strong>与显隐眼睛图标对称内嵌于输入框右侧。<br>
+                            • <strong>PortBridge 双端口桥接</strong>：实现 6000 旗舰端与 6002 兼容通道无缝双向互通，解决浏览器端口限制。
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==========================================
+                 SLIDE 9: 开箱即用的沉浸式 Web 工作台形态
+                 ========================================== -->
+            <section data-auto-animate>
+                <div class="badge badge-purple">
+                    <i class="fa-solid fa-desktop"></i> 产品形态一 · 双模流式沙箱中枢
+                </div>
+                <h2>开箱即用的 AI 沉浸式 Web 终端工作台</h2>
+                <p style="color: var(--text-sub); font-size: 0.82em;">告别黑乎乎的终端命令行，所见即所得，抽象的状态机与流式推流具象呈现。</p>
+
+                <div class="glass-card" style="padding: 20px; margin-top: 16px;">
+                    <div style="display: flex; gap: 18px; align-items: stretch;">
+                        <div style="flex: 1.2; background: rgba(0,0,0,0.5); border-radius: 10px; padding: 16px; border: 1px solid rgba(255,255,255,0.06);">
+                            <div style="font-size: 0.82em; color: #38bdf8; font-weight: bold; margin-bottom: 8px;">
+                                <i class="fa-solid fa-comments"></i> 左侧：智能交互与状态机可视化卡片
+                            </div>
+                            <div style="font-size: 0.72em; color: #94a3b8; line-height: 1.55;">
+                                <div style="padding: 6px 10px; background: rgba(56,189,248,0.08); border-radius: 6px; margin-bottom: 6px;">
+                                    🧠 <strong>[PLAN 节点]</strong> 意图识别：拆解为 3 个子任务...
+                                </div>
+                                <div style="padding: 6px 10px; background: rgba(129,140,248,0.08); border-radius: 6px; margin-bottom: 6px;">
+                                    🔍 <strong>[SEARCH 节点]</strong> Hybrid RAG 检索到 8 份研报 (置信度 0.92)...
+                                </div>
+                                <div style="padding: 6px 10px; background: rgba(52,211,153,0.08); border-radius: 6px;">
+                                    ⚡ <strong>[SSE 流式生成]</strong> 逐 Token 极速吐字打字机体验...
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="flex: 1.4; background: rgba(0,0,0,0.5); border-radius: 10px; padding: 16px; border: 1px solid rgba(255,255,255,0.06);">
+                            <div style="font-size: 0.82em; color: #818cf8; font-weight: bold; margin-bottom: 8px;">
+                                <i class="fa-solid fa-laptop-code"></i> 右侧：实时产物工坊 (Artifacts Studio)
+                            </div>
+                            <div style="font-size: 0.74em; color: #cbd5e1; line-height: 1.55;">
+                                • <strong>内置 Monaco 代码沙箱</strong>：支持 Python/JS 代码高亮与语法校验。<br>
+                                • <strong>HITL 人机协同审批弹窗</strong>：遇高危动作自动挂起，管理员点击“同意”才继续。<br>
+                                • <strong>多模态数据看板</strong>：实时展示生成的 Markdown 研报、图表及 Token 账单明细。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==========================================
+                 SLIDE 10: 24 阶段完整技术能力进阶大图
+                 ========================================== -->
+            <section data-auto-animate>
+                <div class="badge badge-cyan">
+                    <i class="fa-solid fa-stairs"></i> 课程体系 · 24 阶段进阶路线
+                </div>
+                <h2>从 Prompt 到企业级 Agent 的 24 阶段工程阶梯</h2>
+                <p style="color: var(--text-sub); font-size: 0.82em;">全阶段代码均包含可执行示例与自动化断言，层层递进无断层。</p>
+
+                <div class="grid-4" style="margin-top: 18px; font-size: 0.72em;">
+                    <div class="glass-card" style="padding: 14px; border-left: 3px solid #38bdf8;">
+                        <strong style="color: #38bdf8;">基础层 · 模型交互</strong>
+                        <p style="color: var(--text-sub); margin-top: 4px; line-height: 1.4;">
+                            01. Prompt 提示词工程<br>
+                            02. Function Calling 工具调用<br>
+                            03. MCP 上下文协议实战
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 14px; border-left: 3px solid #818cf8;">
+                        <strong style="color: #818cf8;">认知层 · 知识与记忆</strong>
+                        <p style="color: var(--text-sub); margin-top: 4px; line-height: 1.4;">
+                            04. RAG 知识库检索增强<br>
+                            05. Embedding 空间几何<br>
+                            07. Agent 深度长短期记忆<br>
+                            20. GraphRAG 知识图谱融合
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 14px; border-left: 3px solid #fbbf24;">
+                        <strong style="color: #fbbf24;">状态层 · 编排与协同</strong>
+                        <p style="color: var(--text-sub); margin-top: 4px; line-height: 1.4;">
+                            06. LangGraph 循环状态图<br>
+                            15. 企业全栈 Agent 架构协同<br>
+                            20. AutoGen 多 Agent 对话<br>
+                            21. 大规模集群调度编排
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 14px; border-left: 3px solid #34d399;">
+                        <strong style="color: #34d399;">工程与底层部署</strong>
+                        <p style="color: var(--text-sub); margin-top: 4px; line-height: 1.4;">
+                            10. HITL 审批 & 语义缓存<br>
+                            12-14. 网关/持久化/队列铁三角<br>
+                            18. vLLM 推理加速与部署<br>
+                            22-23. 安全防御 & 端侧计算
+                        </p>
+                    </div>
+                </div>
+
+                <div style="margin-top: 16px; text-align: center; font-size: 0.75em; color: #94a3b8;">
+                    🏆 包含内置生产级应用：<span class="code-pill">RepoSense 代码助手</span> · <span class="code-pill">hybrid_rag 检索系统</span> · <span class="code-pill">document_processor 文档解析</span>
+                </div>
+            </section>
+
+            <!-- ==========================================
+                 SLIDE 11: 面向用户群体与画像
+                 ========================================== -->
+            <section data-auto-animate>
+                <div class="badge badge-purple">
+                    <i class="fa-solid fa-users"></i> 目标画像
+                </div>
+                <h2>精准赋能四类工程技术人员</h2>
+                <p style="color: var(--text-sub); font-size: 0.82em;">无论您来自什么开发背景，在这里都能找到阻力最小的转型突破口。</p>
+
+                <div class="grid-2" style="margin-top: 18px;">
+                    <div class="glass-card" style="padding: 18px;">
+                        <h4 style="margin-bottom: 6px; color: #38bdf8; font-size: 0.95em;"><i class="fa-solid fa-database"></i> 传统后端工程师 (Java / Go / Python)</h4>
+                        <p style="font-size: 0.74em; color: #cbd5e1; line-height: 1.55;">
+                            <strong>心声</strong>：“我熟悉高并发与数据库，但怎么接大模型做商业系统？”<br>
+                            <strong>突破</strong>：发现自己的后端积淀是企业级 Agent 最稀缺的护城河，快速掌握 FastAPI 网关、状态落盘与分布式任务调度。
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 18px;">
+                        <h4 style="margin-bottom: 6px; color: #818cf8; font-size: 0.95em;"><i class="fa-solid fa-code"></i> 前端 / 全栈工程师</h4>
+                        <p style="font-size: 0.74em; color: #cbd5e1; line-height: 1.55;">
+                            <strong>心声</strong>：“我也想做出类似 ChatGPT / Claude 带流式推流与实时预览的酷炫应用。”<br>
+                            <strong>突破</strong>：直接获得开箱即用的 React 19 + Monaco 终端沙箱，掌握前端 SSE 分块解包与实时状态渲染。
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 18px;">
+                        <h4 style="margin-bottom: 6px; color: #34d399; font-size: 0.95em;"><i class="fa-solid fa-chart-line"></i> 测试 / 运维 / AI 架构师</h4>
+                        <p style="font-size: 0.74em; color: #cbd5e1; line-height: 1.55;">
+                            <strong>心声</strong>：“怎么科学评估大模型好坏？万一出 Bug 怎么白盒排障？”<br>
+                            <strong>突破</strong>：学会用 Ragas 四大指标量化真实性与召回率，用 LangSmith 进行全链路 Trace 调用追踪与成本审计。
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 18px;">
+                        <h4 style="margin-bottom: 6px; color: #fbbf24; font-size: 0.95em;"><i class="fa-solid fa-rocket"></i> 独立开发者 / AI 创业者</h4>
+                        <p style="font-size: 0.74em; color: #cbd5e1; line-height: 1.55;">
+                            <strong>心声</strong>：“我想在两周内做出一款垂直场景的商业级 AI 应用。”<br>
+                            <strong>突破</strong>：开箱即用的全栈架构骨架与现成的 RepoSense 代码助手，无需从零搭积木，立项即上线。
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==========================================
+                 SLIDE 12: 极简转型飞轮：14 天破局之旅
+                 ========================================== -->
+            <section data-auto-animate>
+                <div class="badge badge-amber">
+                    <i class="fa-solid fa-route"></i> 成长轨道
+                </div>
+                <h2>极简转型飞轮：从第 1 天到第 14 天</h2>
+                <p style="color: var(--text-sub); font-size: 0.82em;">按照阻力最小、成就感最大的节奏，阶梯式跃迁为具备全栈闭环能力的 AI 架构师。</p>
+
+                <div class="grid-4" style="margin-top: 20px;">
+                    <div class="glass-card" style="text-align: center; padding: 18px 14px;">
+                        <span class="badge badge-cyan" style="font-size: 0.65em;">Day 1: 极速破冰</span>
+                        <h4 style="margin-top: 6px; font-size: 0.95em;">单脚本极速体验</h4>
+                        <p style="font-size: 0.72em; color: var(--text-sub); line-height: 1.45;">
+                            跑通 Prompt 与工具调用，零环境摩擦，破除对大模型黑盒的心理恐惧。
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="text-align: center; padding: 18px 14px;">
+                        <span class="badge badge-purple" style="font-size: 0.65em;">Day 3: 认知升级</span>
+                        <h4 style="margin-top: 6px; font-size: 0.95em;">状态机与 RAG 精排</h4>
+                        <p style="font-size: 0.72em; color: var(--text-sub); line-height: 1.45;">
+                            掌握 LangGraph 循环反思与 Hybrid RAG 混合检索，彻底脱离单次对话思维。
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="text-align: center; padding: 18px 14px;">
+                        <span class="badge badge-emerald" style="font-size: 0.65em;">Day 7: 全栈贯通</span>
+                        <h4 style="margin-top: 6px; font-size: 0.95em;">运行第 15 章闭环</h4>
+                        <p style="font-size: 0.72em; color: var(--text-sub); line-height: 1.45;">
+                            跑通 FastAPI + Celery + SQLAlchemy 铁三角，真正理解高抗击企业架构。
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="text-align: center; padding: 18px 14px; border: 1px solid #fbbf24;">
+                        <span class="badge badge-amber" style="font-size: 0.65em;">Day 14: 出师立项</span>
+                        <h4 style="margin-top: 6px; font-size: 0.95em;">企业独立商业落地</h4>
+                        <p style="font-size: 0.72em; color: #fbbf24; line-height: 1.45;">
+                            拿走项目现成代码模版，在自己公司独立立项并主导商业级 AI 应用交付！
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==========================================
+                 SLIDE 13: 终极愿景与未来演进
+                 ========================================== -->
+            <section data-auto-animate>
+                <div class="badge badge-cyan">
+                    <i class="fa-solid fa-compass"></i> 未来蓝图
+                </div>
+                <h2>产品的终极目标与未来演进方向</h2>
+                <p style="color: var(--text-sub); font-size: 0.82em;">走向更加自治、更低门槛、更懂业务的智能化全栈中枢。</p>
+
+                <div class="grid-3" style="margin-top: 20px;">
+                    <div class="glass-card" style="padding: 18px;">
+                        <h4 style="color: #38bdf8; font-size: 0.95em;"><i class="fa-solid fa-network-wired"></i> A2A 智能体自治联邦网络</h4>
+                        <p style="font-size: 0.74em; color: var(--text-sub); line-height: 1.5;">
+                            深化 MCP 协议联邦，让不同的垂直 Agent（代码审查、财务研报、SQL 专家）跨进程动态组队协作。
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 18px;">
+                        <h4 style="color: #818cf8; font-size: 0.95em;"><i class="fa-solid fa-circle-nodes"></i> GraphRAG 深度认知图谱</h4>
+                        <p style="font-size: 0.74em; color: var(--text-sub); line-height: 1.5;">
+                            从文本相似度迈向知识图谱因果推理，实现海量企业多文档的“跨段落多跳逻辑因果分析”。
+                        </p>
+                    </div>
+
+                    <div class="glass-card" style="padding: 18px;">
+                        <h4 style="color: #34d399; font-size: 0.95em;"><i class="fa-solid fa-laptop-code"></i> 边缘端侧异构推理</h4>
+                        <p style="font-size: 0.74em; color: var(--text-sub); line-height: 1.5;">
+                            深度适配 Apple Silicon (MLX / MPS) 与端侧量化压缩，实现高密涉密数据本地物理级闭环。
+                        </p>
+                    </div>
+                </div>
+
+                <div style="margin-top: 28px; text-align: center;">
+                    <p style="font-size: 1.05em; font-weight: 600; color: #ffffff; margin-bottom: 6px;">
+                        🚀 <strong>科技的最高境界，不是制造门槛，而是把复杂的架构解构成每个人都能拼装的积木。</strong>
+                    </p>
+                    <p style="font-size: 0.78em; color: var(--text-sub);">
+                        AgentForge · 智炼工坊 —— 愿成为每一位工程师与企业迈入 AI 全栈时代最坚实、最温和的引路伙伴！
+                    </p>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <!-- Reveal.js 脚本 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.min.js"></script>
+    <script>
+        Reveal.initialize({
+            hash: true,
+            slideNumber: 'c/t',
+            transition: 'slide',
+            transitionSpeed: 'fast',
+            backgroundTransition: 'fade',
+            center: true,
+            controls: true,
+            progress: true,
+            keyboard: true,
+            overview: true,
+            width: 1200,
+            height: 700,
+            margin: 0.04
+        });
+    </script>
+</body>
+</html>

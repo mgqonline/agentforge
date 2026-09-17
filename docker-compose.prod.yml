@@ -1,0 +1,132 @@
+# =====================================================================
+# AgentForge · 生产级企业一键全栈编排清单 (Production Docker Compose)
+# =====================================================================
+# 一键启动完整企业级 AI 原生全栈系统：
+#   1. PostgreSQL 15 : LangGraph Checkpoint 长效记忆与会话历史库
+#   2. Redis 7       : Celery 分布式任务队列 Broker 与高敏语义缓存
+#   3. Backend Core  : FastAPI 异步大模型高性能网关服务
+#   4. Celery Worker : 慢任务、深度研报与多 SubAgent 并行计算集群
+#   5. Frontend React: 现代化 Web 工作台 (Monaco 沙箱 + SSE 实时推流)
+#
+# 使用命令：
+#   docker-compose -f docker-compose.prod.yml up -d
+# =====================================================================
+
+version: "3.8"
+
+services:
+  # 1. 结构化数据与 Checkpoint 记忆库
+  postgres:
+    image: postgres:15-alpine
+    container_name: agentforge_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-agentforge_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agentforge_secret_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-agentforge_db}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - agentforge_pgdata:/var/lib/postgresql/data
+    networks:
+      - agentforge_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agentforge_user} -d ${POSTGRES_DB:-agentforge_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. 高敏缓存与 Celery 消息队列
+  redis:
+    image: redis:7-alpine
+    container_name: agentforge_redis
+    restart: always
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:-}"
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - agentforge_redisdata:/data
+    networks:
+      - agentforge_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # 3. 后端 AI 核心网关引擎
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: agentforge_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - PORT=8000
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-agentforge_user}:${POSTGRES_PASSWORD:-agentforge_secret_2026}@postgres:5432/${POSTGRES_DB:-agentforge_db}
+      - REDIS_URL=redis://redis:6379/0
+      - ALLOWED_ORIGINS=*
+    volumes:
+      - ./chroma_db:/app/backend/chroma_db
+      - ./logs:/app/backend/logs
+      - ./document_processor/samples:/app/document_processor/samples
+    networks:
+      - agentforge_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/docs || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # 4. Celery 分布式长任务 Worker 计算节点
+  celery_worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: agentforge_celery_worker
+    restart: always
+    command: celery -A 14-celery-advanced.celery_app worker --loglevel=info --concurrency=4
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-agentforge_user}:${POSTGRES_PASSWORD:-agentforge_secret_2026}@postgres:5432/${POSTGRES_DB:-agentforge_db}
+      - REDIS_URL=redis://redis:6379/0
+    networks:
+      - agentforge_net
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  # 5. 前端 React 沉浸式 Web 终端工作台
+  frontend:
+    build:
+      context: ./frontend-react
+      dockerfile: Dockerfile
+    container_name: agentforge_frontend
+    restart: always
+    ports:
+      - "5173:80"
+    networks:
+      - agentforge_net
+    depends_on:
+      - backend
+
+networks:
+  agentforge_net:
+    driver: bridge
+
+volumes:
+  agentforge_pgdata:
+  agentforge_redisdata:

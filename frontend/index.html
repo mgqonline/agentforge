@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Talkweb AI Enterprise RAG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./src/style.css" />
+  <!-- 引入 marked.js 解析 Markdown -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<body>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar glassmorphism" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <div class="logo-icon"></div>
+          <h1>Talkweb Agent</h1>
+        </div>
+        <button id="closeSidebarBtn" class="icon-btn" title="收起侧边栏">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="9" y1="3" x2="9" y2="21"></line>
+            <polyline points="15 15 12 12 15 9"></polyline>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="sidebar-title" style="display: flex; justify-content: space-between; align-items: center; padding-right: 8px;">
+        <span>历史对话</span>
+        <button id="newChatBtn" class="new-chat-btn" title="新建对话">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+      <ul class="history-list" id="historyList">
+        <!-- History items will be dynamically injected here -->
+      </ul>
+
+      <div class="sidebar-account-zone" id="sidebarAccountZone"></div>
+    </aside>
+
+    <!-- Main Chat Area -->
+    <main class="chat-container">
+      <header class="chat-header glassmorphism">
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <button id="openSidebarBtn" class="icon-btn hidden" title="展开侧边栏">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="9" y1="3" x2="9" y2="21"></line>
+              <polyline points="15 9 18 12 15 15"></polyline>
+            </svg>
+          </button>
+          <h2>企业知识库 RAG 终端</h2>
+        </div>
+        <div class="status-indicator" id="wsStatus">
+          <span class="dot disconnected"></span> 连接断开
+        </div>
+      </header>
+
+      <div class="chat-history" id="chatHistory">
+        <!-- Messages will be appended here -->
+        <div class="message system">
+          <div class="avatar">🤖</div>
+          <div class="content">您好！我是拓维信息首席 AI 助理。已加载全量企业级文档，请问有什么可以帮您？</div>
+        </div>
+      </div>
+
+      <div class="input-area glassmorphism">
+        <div id="loadingStatus" class="loading-status hidden">
+          <span></span>
+        </div>
+        <div class="input-wrapper">
+          <div id="imagePreviewContainer" class="image-preview-container hidden">
+            <img id="imagePreview" src="" alt="Preview">
+            <button id="removeImageBtn" class="remove-image-btn">✕</button>
+          </div>
+          
+          <div id="audioPreviewContainer" class="image-preview-container hidden" style="margin-left: 12px; background: rgba(100,200,100,0.2); padding: 4px 12px; border-radius: 4px; display: flex; align-items: center; gap: 8px;">
+            <span>🎵 语音已录制</span>
+            <button id="removeAudioBtn" class="remove-image-btn" style="position: relative; background: transparent;">✕</button>
+          </div>
+          
+          <div id="filePreviewContainer" class="image-preview-container hidden" style="margin-left: 12px; background: rgba(100,150,250,0.2); padding: 4px 12px; border-radius: 4px; display: flex; align-items: center; gap: 8px;">
+            <span id="filePreviewIcon">📄</span><span><span id="filePreviewName"></span></span>
+            <button id="removeFileBtn" class="remove-image-btn" style="position: relative; background: transparent;">✕</button>
+          </div>
+
+          <div id="facePreviewContainer" class="image-preview-container hidden" style="margin-left: 12px; background: rgba(255,140,0,0.25); padding: 4px 12px; border-radius: 4px; display: flex; align-items: center; gap: 8px; border: 1px solid rgba(255,165,0,0.4);">
+            <span>👤 <span id="facePreviewText" style="color: #ffa500; font-weight: bold;">人脸核选载入</span></span>
+            <img id="facePreview" src="" alt="Face Preview" style="height: 28px; width: 28px; object-fit: cover; border-radius: 50%; border: 1px solid rgba(255,165,0,0.8);">
+            <button id="removeFaceBtn" class="remove-image-btn" style="position: relative; background: transparent;">✕</button>
+          </div>
+          
+          <div class="input-row">
+            <button id="uploadImageBtn" class="upload-btn" title="上传文档与图文 (OCR 智能识别提取)">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+              </svg>
+            </button>
+
+            <button id="uploadFaceBtn" class="upload-btn" title="上传人像相片 (YOLOv8 + ArcFace 生物鉴别核核)">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #ffa500;">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            </button>
+            
+            <button id="recordAudioBtn" class="upload-btn" title="上传语音文件（回转文字内容）">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 6.835V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2h-.343"></path>
+                <path d="M14 2v5a1 1 0 0 0 1 1h5"></path>
+                <path d="M2 19a2 2 0 0 1 4 0v1a2 2 0 0 1-4 0v-4a6 6 0 0 1 12 0v4a2 2 0 0 1-4 0v-1a2 2 0 0 1 4 0"></path>
+              </svg>
+            </button>
+
+            <input type="file" id="imageInput" accept="image/*, .pdf, .txt, .docx, .md, .xlsx, .csv, .json, .pptx, .html, .xml" style="display: none;">
+            <input type="file" id="faceInput" accept="image/*" style="display: none;">
+            <input type="file" id="audioInput" accept="audio/*, .mp3, .wav, .m4a, .webm, .flac, .ogg, .aac" style="display: none;">
+            
+            <textarea id="userInput" placeholder="输入您的问题或上传图片进行识别 (Shift+Enter 换行, Enter 发送)..." rows="1"></textarea>
+            
+            <button id="stopBtn" class="stop-btn hidden" title="中止生成" style="margin-right: 8px;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect>
+              </svg>
+            </button>
+            <button id="sendBtn" class="send-btn">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2.01 21L23 12L2.01 3L2 10L17 12L2 14L2.01 21Z" fill="currentColor"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Mode Toggle Moved Below Input -->
+        <div class="mode-toggle-bottom">
+          <span class="mode-label">运行模式:</span>
+          <div class="toggle-switch">
+            <!-- 默认不勾选即为极速模式 -->
+            <input type="checkbox" id="modeSwitch">
+            <label for="modeSwitch" class="slider">
+              <span class="fast-txt">极速</span>
+              <span class="expert-txt">专家</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
