@@ -3,7 +3,7 @@ import {
   Database, UploadCloud, FileText, Trash2, RefreshCw, 
   Search, CheckCircle2, AlertCircle, Clock, HardDrive, 
   Layers, X, FileSpreadsheet, FileCode, Presentation, ShieldCheck,
-  Sparkles, Play, Sliders, Zap, Tag
+  Sparkles, Play, Sliders, Zap, Tag, Copy
 } from 'lucide-react';
 
 export default function KnowledgeManagerModal({ isOpen, onClose }) {
@@ -21,8 +21,11 @@ export default function KnowledgeManagerModal({ isOpen, onClose }) {
   // RAG 检索演练器状态
   const [playgroundQuery, setPlaygroundQuery] = useState('MCP 模型上下文协议的核心架构与跨进程通讯');
   const [playgroundTopK, setPlaygroundTopK] = useState(4);
+  const [scoreThreshold, setScoreThreshold] = useState(0.0);
   const [playgroundResults, setPlaygroundResults] = useState(null);
   const [playgroundLoading, setPlaygroundLoading] = useState(false);
+  const [copiedMock, setCopiedMock] = useState(false);
+  const [copiedChunkIdx, setCopiedChunkIdx] = useState(null);
 
   const presetQueries = [
     'MCP 模型上下文协议的核心架构与跨进程通讯',
@@ -157,15 +160,16 @@ export default function KnowledgeManagerModal({ isOpen, onClose }) {
     }
   };
 
-  const handleRunRetrieval = async (queryText = null) => {
+  const handleRunRetrieval = async (queryText = null, customTopK = null) => {
     const q = (queryText !== null ? queryText : playgroundQuery).trim();
     if (!q) return;
+    const k = customTopK !== null ? customTopK : playgroundTopK;
     setPlaygroundLoading(true);
     try {
       const res = await fetch('/api/v1/knowledge/test-retrieval', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, top_k: playgroundTopK })
+        body: JSON.stringify({ query: q, top_k: k })
       });
       const data = await res.json();
       if (data.status === 'success') {
@@ -178,6 +182,33 @@ export default function KnowledgeManagerModal({ isOpen, onClose }) {
     } finally {
       setPlaygroundLoading(false);
     }
+  };
+
+  const handleCopyPythonMock = () => {
+    if (!playgroundResults || !playgroundResults.chunks || playgroundResults.chunks.length === 0) return;
+    const chunksData = playgroundResults.chunks.map(c => ({
+      rank: c.rank,
+      source: c.source,
+      type: c.type,
+      content: c.content || c.preview
+    }));
+    const pyCode = `# 知识库演练召回切片快照 (Query: "${playgroundQuery}")
+# Top-K: ${playgroundTopK} | 最低相似度过滤阈值: ${scoreThreshold} | 生成时间: ${new Date().toLocaleString()}
+MOCK_RETRIEVED_CHUNKS = ${JSON.stringify(chunksData, null, 4).replace(/true/g, 'True').replace(/false/g, 'False').replace(/null/g, 'None')}
+
+# 快捷获取上下文拼接文本
+def get_mock_knowledge_context():
+    return "\\n\\n".join([f"【来源: {c['source']}】\\n" + c['content'] for c in MOCK_RETRIEVED_CHUNKS])
+`;
+    navigator.clipboard.writeText(pyCode);
+    setCopiedMock(true);
+    setTimeout(() => setCopiedMock(false), 2500);
+  };
+
+  const handleCopyChunk = (chunk, idx) => {
+    navigator.clipboard.writeText(chunk.content || chunk.preview);
+    setCopiedChunkIdx(idx);
+    setTimeout(() => setCopiedChunkIdx(null), 2000);
   };
 
   const getFileIcon = (ext) => {
@@ -670,6 +701,56 @@ export default function KnowledgeManagerModal({ isOpen, onClose }) {
                     </button>
                   ))}
                 </div>
+
+                {/* 参数调节滑块栏 (Top-K 与 相似度过滤) */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginTop: '10px',
+                  padding: '8px 12px',
+                  background: 'rgba(0,0,0,0.22)',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(255,255,255,0.04)',
+                  fontSize: '11.5px',
+                  color: 'var(--wb-text-dim, #9ca3af)',
+                  flexWrap: 'wrap',
+                  gap: '12px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Sliders size={13} color="#3b82f6" />
+                    <span>召回深度 Top-K: <strong style={{ color: '#fff' }}>{playgroundTopK}</strong></span>
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="10" 
+                      step="1" 
+                      value={playgroundTopK} 
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setPlaygroundTopK(val);
+                        if (playgroundResults) handleRunRetrieval(null, val);
+                      }}
+                      style={{ width: '75px', accentColor: '#3b82f6', cursor: 'pointer' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>相关性阈值: <strong style={{ color: '#34d399' }}>{scoreThreshold.toFixed(2)}</strong></span>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="1.0" 
+                      step="0.05" 
+                      value={scoreThreshold} 
+                      onChange={(e) => setScoreThreshold(parseFloat(e.target.value))}
+                      style={{ width: '75px', accentColor: '#10b981', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '10.5px', color: 'rgba(255,255,255,0.35)' }}>
+                      (低于阈值切片弱化提示)
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {/* 动态特征融合权重卡片 (DFL Diagnostics) */}
@@ -696,6 +777,42 @@ export default function KnowledgeManagerModal({ isOpen, onClose }) {
                     <span style={{ color: 'var(--wb-text-dim, #9ca3af)' }}>检索耗时: </span>
                     <strong style={{ color: '#fbbf24' }}>{playgroundResults.latency_ms || 35} ms</strong>
                   </div>
+                </div>
+              )}
+
+              {/* 召回结果与 Python Mock 变量导出栏 */}
+              {playgroundResults && playgroundResults.chunks && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '2px 4px'
+                }}>
+                  <div style={{ fontSize: '12px', color: 'var(--wb-text-dim, #9ca3af)' }}>
+                    <span>检索召回切片 (已按相关度综合重排 Top-{playgroundResults.chunks.length})</span>
+                  </div>
+
+                  <button
+                    onClick={handleCopyPythonMock}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '4px 10px',
+                      fontSize: '11.5px',
+                      borderRadius: '5px',
+                      background: copiedMock ? 'rgba(16, 185, 129, 0.2)' : 'rgba(59, 130, 246, 0.12)',
+                      border: `1px solid ${copiedMock ? '#10b981' : 'rgba(59, 130, 246, 0.3)'}`,
+                      color: copiedMock ? '#34d399' : '#60a5fa',
+                      cursor: 'pointer',
+                      fontWeight: 500,
+                      transition: 'all 0.15s ease'
+                    }}
+                    title="将召回结果转为 Python 格式，可直接粘贴在代码区中作为测试 Mock 变量"
+                  >
+                    {copiedMock ? <CheckCircle2 size={13} /> : <FileCode size={13} />}
+                    <span>{copiedMock ? '✔ 已复制为 Python Mock 变量！' : '📋 复制为 Python Mock 变量'}</span>
+                  </button>
                 </div>
               )}
 
@@ -752,9 +869,31 @@ export default function KnowledgeManagerModal({ isOpen, onClose }) {
                             {chunk.type}
                           </span>
                         </div>
-                        <span style={{ fontSize: '11px', color: 'var(--wb-text-dim, #9ca3af)' }}>
-                          长度: {chunk.length} 字符
-                        </span>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--wb-text-dim, #9ca3af)' }}>
+                            长度: {chunk.length} 字符
+                          </span>
+                          <button
+                            onClick={() => handleCopyChunk(chunk, chunk.rank)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: copiedChunkIdx === chunk.rank ? '#34d399' : 'var(--wb-text-dim, #9ca3af)',
+                              cursor: 'pointer',
+                              fontSize: '11px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '2px 6px',
+                              borderRadius: '4px'
+                            }}
+                            title="复制切片原文"
+                          >
+                            {copiedChunkIdx === chunk.rank ? <CheckCircle2 size={12} /> : <Copy size={12} />}
+                            <span>{copiedChunkIdx === chunk.rank ? '已复制' : '复制切片'}</span>
+                          </button>
+                        </div>
                       </div>
 
                       <div style={{

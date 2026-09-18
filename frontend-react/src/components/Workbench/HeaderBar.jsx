@@ -20,6 +20,7 @@ export default function HeaderBar({
   currentUser = null,
   tenantsList = [],
   onSwitchTenant = () => {},
+  onResetTenantQuota = () => {},
   onOpenGovernance = () => {},
   onOpenKnowledge = () => {},
   onOpenLogin = () => {},
@@ -36,12 +37,33 @@ export default function HeaderBar({
   const userMenuRef = useRef(null);
   const [isTenantMenuOpen, setIsTenantMenuOpen] = useState(false);
   const tenantMenuRef = useRef(null);
+  const [isResettingQuota, setIsResettingQuota] = useState(false);
+  const [resetNotice, setResetNotice] = useState(null);
   const [modelCluster, setModelCluster] = useState(null);
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const modelMenuRef = useRef(null);
   const [pingLatencies, setPingLatencies] = useState({}); // { [nodeId]: latency_ms }
   const [isPinging, setIsPinging] = useState(false);
   const [isDrilling, setIsDrilling] = useState(false);
+
+  const handleTriggerReset = async (tenantId, addBudget = 0) => {
+    if (isResettingQuota) return;
+    setIsResettingQuota(true);
+    setResetNotice('正在重置租户配额...');
+    try {
+      const res = await onResetTenantQuota(tenantId, 0, addBudget);
+      if (res?.success) {
+        setResetNotice('✔ 水位已恢复！');
+      } else {
+        setResetNotice(`⚠️ ${res?.message || '重置失败'}`);
+      }
+    } catch (err) {
+      setResetNotice(`⚠️ 异常: ${err.message}`);
+    } finally {
+      setIsResettingQuota(false);
+      setTimeout(() => setResetNotice(null), 3000);
+    }
+  };
 
   const fetchModelStatus = async () => {
     try {
@@ -268,185 +290,287 @@ export default function HeaderBar({
       {/* 右侧：1. 租户算力胶囊  2. 沙箱与模式  3. 个人中心下拉菜单 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         {/* 1. 企业租户与算力微胶囊 (Tenant & Token Budget Capsule) */}
-        {currentTenant && (
-          <div ref={tenantMenuRef} style={{ position: 'relative' }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              background: 'var(--wb-bg-subtle, rgba(255, 255, 255, 0.04))',
-              border: `1px solid ${currentTenant.is_exhausted ? 'rgba(239, 68, 68, 0.5)' : 'var(--wb-border-subtle, rgba(255, 255, 255, 0.1))'}`,
-              borderRadius: '6px',
-              padding: '2px 8px',
-              gap: '8px',
-              fontSize: '11px',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
-            }}>
-              {/* 租户选择触发器 */}
-              <div 
-                onClick={() => setIsTenantMenuOpen(!isTenantMenuOpen)}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '4px',
-                  cursor: 'pointer',
-                  color: 'var(--wb-text-bright, #fff)'
-                }}
-                title="点击切换组织/租户算力池"
-              >
-                <Building2 size={12} color="var(--wb-accent-primary, #3b82f6)" />
-                <span style={{ fontWeight: 600, maxWidth: '130px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {currentTenant.tenant_name?.split(' ')[0] || '企业核心智算中心'}
-                </span>
-                <ChevronDown size={11} color="var(--wb-text-dim, #888)" />
-              </div>
+        {currentTenant && (() => {
+          const consumed = currentTenant.tokens_consumed || 0;
+          const budget = currentTenant.monthly_token_budget || 1;
+          const currentPercent = Math.min(100, Math.round((consumed / budget) * 100));
+          const isExhausted = currentTenant.is_exhausted || currentPercent >= 100;
+          const isWarning80 = !isExhausted && currentPercent >= 80;
 
-              {/* 分隔线 */}
-              <span style={{ color: 'var(--wb-border-subtle, rgba(255,255,255,0.15))' }}>|</span>
-
-              {/* Token 预算指示 */}
-              <div 
-                onClick={onOpenGovernance}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  cursor: 'pointer',
-                  color: currentTenant.is_exhausted ? '#f87171' : 'var(--wb-text-dim, #94a3b8)'
-                }}
-                title="点击查看 Token 预算与权限治理中心"
-              >
-                <Zap size={11} color={currentTenant.is_exhausted ? '#ef4444' : '#fbbf24'} />
-                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>
-                  {Math.round((currentTenant.tokens_consumed || 0) / 1000)}k/{Math.round((currentTenant.monthly_token_budget || 0) / 1000)}k
-                </span>
-                {currentTenant.is_exhausted && (
-                  <span style={{ fontSize: '9px', fontWeight: 700, color: '#f87171', background: 'rgba(239, 68, 68, 0.2)', padding: '0 3px', borderRadius: '3px' }}>
-                    熔断
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* 租户业务价值与算力切换下拉浮层 */}
-            {isTenantMenuOpen && (
+          return (
+            <div ref={tenantMenuRef} style={{ position: 'relative' }}>
               <div style={{
-                position: 'absolute',
-                top: 'calc(100% + 6px)',
-                left: 0,
-                width: '320px',
-                background: 'var(--wb-bg-elevated, #161922)',
-                border: '1px solid var(--wb-border-subtle, rgba(255, 255, 255, 0.12))',
-                borderRadius: '10px',
-                boxShadow: '0 12px 30px rgba(0,0,0,0.6)',
-                zIndex: 1000,
-                padding: '12px',
                 display: 'flex',
-                flexDirection: 'column',
-                gap: '8px'
+                alignItems: 'center',
+                background: 'var(--wb-bg-subtle, rgba(255, 255, 255, 0.04))',
+                border: isExhausted 
+                  ? '1px solid rgba(239, 68, 68, 0.6)' 
+                  : isWarning80 
+                  ? '1px solid rgba(245, 158, 11, 0.6)' 
+                  : '1px solid var(--wb-border-subtle, rgba(255, 255, 255, 0.1))',
+                borderRadius: '6px',
+                padding: '2px 8px',
+                gap: '8px',
+                fontSize: '11px',
+                boxShadow: isWarning80 
+                  ? '0 0 8px rgba(245, 158, 11, 0.25)' 
+                  : '0 1px 2px rgba(0,0,0,0.2)'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--wb-text-bright, #fff)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Building2 size={13} color="var(--wb-accent-primary, #3b82f6)" />
-                    <span>多租户算力池切换</span>
-                  </div>
-                  <span style={{ fontSize: '10px', color: 'var(--wb-text-dim, #888)' }}>
-                    {tenantsList.length || 3} 个可用组织
+                {/* 租户选择触发器 */}
+                <div 
+                  onClick={() => setIsTenantMenuOpen(!isTenantMenuOpen)}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px',
+                    cursor: 'pointer',
+                    color: 'var(--wb-text-bright, #fff)'
+                  }}
+                  title="点击切换组织/租户算力池"
+                >
+                  <Building2 size={12} color="var(--wb-accent-primary, #3b82f6)" />
+                  <span style={{ fontWeight: 600, maxWidth: '130px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {currentTenant.tenant_name?.split(' ')[0] || '企业核心智算中心'}
                   </span>
+                  <ChevronDown size={11} color="var(--wb-text-dim, #888)" />
                 </div>
 
-                {/* 租户卡片列表 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '260px', overflowY: 'auto' }}>
-                  {(tenantsList.length > 0 ? tenantsList : [
-                    { tenant_id: 'tenant_enterprise_core', tenant_name: '企业核心智算中心', max_qps: 50, monthly_token_budget: 2000000, tokens_consumed: 142500 },
-                    { tenant_id: 'tenant_algorithm_lab', tenant_name: '创新算法实验室', max_qps: 20, monthly_token_budget: 500000, tokens_consumed: 85200 },
-                    { tenant_id: 'tenant_guest_sandbox', tenant_name: '体验试用租户', max_qps: 2, monthly_token_budget: 10000, tokens_consumed: 9850 }
-                  ]).map((t) => {
-                    const isSelected = (currentTenant?.tenant_id === t.tenant_id);
-                    const remaining = Math.max(0, (t.monthly_token_budget || 0) - (t.tokens_consumed || 0));
-                    const percentUsed = Math.min(100, Math.round(((t.tokens_consumed || 0) / (t.monthly_token_budget || 1)) * 100));
-                    const isNearLimit = remaining <= 200;
+                {/* 分隔线 */}
+                <span style={{ color: 'var(--wb-border-subtle, rgba(255,255,255,0.15))' }}>|</span>
 
-                    let tagLabel = '主算力集群 · 50 QPS';
-                    let tagColor = '#60a5fa';
-                    if (t.tenant_id.includes('lab')) {
-                      tagLabel = '算法隔离池 · 20 QPS';
-                      tagColor = '#a78bfa';
-                    } else if (t.tenant_id.includes('guest')) {
-                      tagLabel = '只读测试池 · 2 QPS (熔断演练)';
-                      tagColor = '#f87171';
-                    }
-
-                    return (
-                      <div
-                        key={t.tenant_id}
-                        onClick={() => {
-                          onSwitchTenant(t.tenant_id);
-                          setIsTenantMenuOpen(false);
-                        }}
-                        style={{
-                          padding: '8px 10px',
-                          borderRadius: '6px',
-                          background: isSelected ? 'rgba(59, 130, 246, 0.12)' : 'rgba(255, 255, 255, 0.02)',
-                          border: `1px solid ${isSelected ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.06)'}`,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '4px',
-                          transition: 'all 0.15s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: '11.5px', fontWeight: 600, color: isSelected ? '#fff' : 'var(--wb-text-bright, #eee)' }}>
-                            {t.tenant_name}
-                          </span>
-                          {isSelected && (
-                            <span style={{ fontSize: '10px', color: '#4ade80', fontWeight: 600 }}>● 当前生效</span>
-                          )}
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '10px', color: 'var(--wb-text-dim, #888)' }}>
-                          <span style={{ color: tagColor, fontWeight: 500 }}>{tagLabel}</span>
-                          <span style={{ fontFamily: 'monospace', color: isNearLimit ? '#f87171' : 'var(--wb-text-sub, #bbb)' }}>
-                            剩 {remaining.toLocaleString()} Tokens ({100 - percentUsed}%)
-                          </span>
-                        </div>
-
-                        {/* 水位进度条 */}
-                        <div style={{ width: '100%', height: '3px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', overflow: 'hidden' }}>
-                          <div style={{
-                            width: `${percentUsed}%`,
-                            height: '100%',
-                            background: isNearLimit ? '#ef4444' : percentUsed > 80 ? '#fbbf24' : '#3b82f6',
-                            transition: 'width 0.2s'
-                          }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* 底部业务作用提示 */}
-                <div style={{
-                  padding: '6px 8px',
-                  borderRadius: '4px',
-                  background: 'rgba(255, 255, 255, 0.02)',
-                  fontSize: '10px',
-                  color: 'var(--wb-text-dim, #888)',
-                  lineHeight: 1.4,
-                  borderTop: '1px solid rgba(255, 255, 255, 0.05)'
-                }}>
-                  💡 <strong>业务作用</strong>：切换租户将直接变更当前代码沙箱与 Agent 的<strong>算力扣减归属池</strong>、<strong>并发 QPS 限流门禁</strong>与<strong>独立计费账单</strong>，各租户间算力完全物理隔离。
+                {/* Token 预算指示 */}
+                <div 
+                  onClick={onOpenGovernance}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    cursor: 'pointer',
+                    color: isExhausted ? '#f87171' : isWarning80 ? '#fbbf24' : 'var(--wb-text-dim, #94a3b8)'
+                  }}
+                  title="点击查看 Token 预算与权限治理中心"
+                >
+                  <Zap size={11} color={isExhausted ? '#ef4444' : isWarning80 ? '#f59e0b' : '#fbbf24'} />
+                  <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>
+                    {Math.round(consumed / 1000)}k/{Math.round(budget / 1000)}k
+                  </span>
+                  {isExhausted ? (
+                    <span style={{ fontSize: '9px', fontWeight: 700, color: '#f87171', background: 'rgba(239, 68, 68, 0.2)', padding: '0 3px', borderRadius: '3px' }}>
+                      熔断
+                    </span>
+                  ) : isWarning80 ? (
+                    <span style={{ fontSize: '9px', fontWeight: 700, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.2)', padding: '0 3px', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                      <AlertTriangle size={8} />
+                      <span>80%+</span>
+                    </span>
+                  ) : null}
                 </div>
               </div>
-            )}
-          </div>
-        )}
+
+              {/* 租户业务价值与算力切换下拉浮层 */}
+              {isTenantMenuOpen && (
+                <div style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 6px)',
+                  left: 0,
+                  width: '320px',
+                  background: 'var(--wb-bg-elevated, #161922)',
+                  border: '1px solid var(--wb-border-subtle, rgba(255, 255, 255, 0.12))',
+                  borderRadius: '10px',
+                  boxShadow: '0 12px 30px rgba(0,0,0,0.6)',
+                  zIndex: 1000,
+                  padding: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--wb-text-bright, #fff)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Building2 size={13} color="var(--wb-accent-primary, #3b82f6)" />
+                      <span>多租户算力池切换</span>
+                    </div>
+                    <span style={{ fontSize: '10px', color: 'var(--wb-text-dim, #888)' }}>
+                      {tenantsList.length || 3} 个可用组织
+                    </span>
+                  </div>
+
+                  {/* 租户卡片列表 */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '240px', overflowY: 'auto' }}>
+                    {(tenantsList.length > 0 ? tenantsList : [
+                      { tenant_id: 'tenant_enterprise_core', tenant_name: '企业核心智算中心', max_qps: 50, monthly_token_budget: 2000000, tokens_consumed: 142500 },
+                      { tenant_id: 'tenant_algorithm_lab', tenant_name: '创新算法实验室', max_qps: 20, monthly_token_budget: 500000, tokens_consumed: 85200 },
+                      { tenant_id: 'tenant_guest_sandbox', tenant_name: '体验试用租户', max_qps: 2, monthly_token_budget: 10000, tokens_consumed: 9850 }
+                    ]).map((t) => {
+                      const isSelected = (currentTenant?.tenant_id === t.tenant_id);
+                      const remaining = Math.max(0, (t.monthly_token_budget || 0) - (t.tokens_consumed || 0));
+                      const percentUsed = Math.min(100, Math.round(((t.tokens_consumed || 0) / (t.monthly_token_budget || 1)) * 100));
+                      const isNearLimit = remaining <= 200;
+                      const isCardWarning80 = percentUsed >= 80 && !isNearLimit;
+
+                      let tagLabel = '主算力集群 · 50 QPS';
+                      let tagColor = '#60a5fa';
+                      if (t.tenant_id.includes('lab')) {
+                        tagLabel = '算法隔离池 · 20 QPS';
+                        tagColor = '#a78bfa';
+                      } else if (t.tenant_id.includes('guest')) {
+                        tagLabel = '只读测试池 · 2 QPS (熔断演练)';
+                        tagColor = '#f87171';
+                      }
+
+                      return (
+                        <div
+                          key={t.tenant_id}
+                          onClick={() => {
+                            onSwitchTenant(t.tenant_id);
+                            setIsTenantMenuOpen(false);
+                          }}
+                          style={{
+                            padding: '8px 10px',
+                            borderRadius: '6px',
+                            background: isSelected ? 'rgba(59, 130, 246, 0.12)' : 'rgba(255, 255, 255, 0.02)',
+                            border: `1px solid ${isSelected ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.06)'}`,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '11.5px', fontWeight: 600, color: isSelected ? '#fff' : 'var(--wb-text-bright, #eee)' }}>
+                              {t.tenant_name}
+                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {isCardWarning80 && (
+                                <span style={{ fontSize: '9.5px', color: '#f59e0b', fontWeight: 600 }}>● 80%+预警</span>
+                              )}
+                              {isSelected && (
+                                <span style={{ fontSize: '10px', color: '#4ade80', fontWeight: 600 }}>● 当前生效</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '10px', color: 'var(--wb-text-dim, #888)' }}>
+                            <span style={{ color: tagColor, fontWeight: 500 }}>{tagLabel}</span>
+                            <span style={{ fontFamily: 'monospace', color: isNearLimit ? '#f87171' : 'var(--wb-text-sub, #bbb)' }}>
+                              剩 {remaining.toLocaleString()} Tokens ({100 - percentUsed}%)
+                            </span>
+                          </div>
+
+                          {/* 水位进度条 */}
+                          <div style={{ width: '100%', height: '3px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', overflow: 'hidden' }}>
+                            <div style={{
+                              width: `${percentUsed}%`,
+                              height: '100%',
+                              background: isNearLimit ? '#ef4444' : percentUsed >= 80 ? '#f59e0b' : '#3b82f6',
+                              transition: 'width 0.2s'
+                            }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* 算力池紧急调试恢复栏 */}
+                  <div style={{
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    background: 'rgba(59, 130, 246, 0.06)',
+                    border: '1px solid rgba(59, 130, 246, 0.2)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--wb-text-bright, #fff)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <RotateCcw size={12} color="#3b82f6" />
+                        <span>调试额度维护</span>
+                      </span>
+                      {resetNotice && (
+                        <span style={{ fontSize: '10.5px', color: resetNotice.startsWith('✔') ? '#34d399' : '#fbbf24', fontWeight: 500 }}>
+                          {resetNotice}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTriggerReset(currentTenant.tenant_id, 0);
+                        }}
+                        disabled={isResettingQuota}
+                        style={{
+                          flex: 1,
+                          padding: '4px 8px',
+                          fontSize: '10.5px',
+                          borderRadius: '4px',
+                          background: 'rgba(59, 130, 246, 0.18)',
+                          border: '1px solid rgba(59, 130, 246, 0.4)',
+                          color: '#60a5fa',
+                          cursor: 'pointer',
+                          fontWeight: 500,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px'
+                        }}
+                        title="将当前租户已消耗 Token 清零，解除熔断/预警"
+                      >
+                        <RotateCcw size={11} className={isResettingQuota ? 'animate-spin' : ''} />
+                        <span>{isResettingQuota ? '重置中...' : '🔄 清零消耗水位'}</span>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTriggerReset(currentTenant.tenant_id, 100000);
+                        }}
+                        disabled={isResettingQuota}
+                        style={{
+                          flex: 1,
+                          padding: '4px 8px',
+                          fontSize: '10.5px',
+                          borderRadius: '4px',
+                          background: 'rgba(16, 185, 129, 0.18)',
+                          border: '1px solid rgba(16, 185, 129, 0.4)',
+                          color: '#34d399',
+                          cursor: 'pointer',
+                          fontWeight: 500,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px'
+                        }}
+                        title="为当前租户追加 100,000 月度 Token 预算"
+                      >
+                        <Zap size={11} />
+                        <span>➕ 追加 100k 额度</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 底部业务作用提示 */}
+                  <div style={{
+                    padding: '6px 8px',
+                    borderRadius: '4px',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    fontSize: '10px',
+                    color: 'var(--wb-text-dim, #888)',
+                    lineHeight: 1.4,
+                    borderTop: '1px solid rgba(255, 255, 255, 0.05)'
+                  }}>
+                    💡 <strong>业务作用</strong>：切换租户将直接变更当前代码沙箱与 Agent 的<strong>算力扣减归属池</strong>、<strong>并发 QPS 限流门禁</strong>与<strong>独立计费账单</strong>，各租户间算力完全物理隔离。
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* 2. 沙箱指示点与视图切换 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

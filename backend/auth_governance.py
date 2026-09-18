@@ -770,6 +770,40 @@ def deduct_tenant_tokens(tenant_id: str, tokens: int = 150) -> Dict[str, Any]:
     }
 
 
+def reset_tenant_quota(tenant_id: str, new_consumed: int = 0, add_budget: int = 0) -> Dict[str, Any]:
+    """一键重置或增补租户 Token 水位 (供演示、排障与开发环境一键恢复)"""
+    tenant = TENANT_STORE.get(tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail=f"租户 [{tenant_id}] 不存在")
+    
+    tenant.tokens_consumed = max(0, new_consumed)
+    if add_budget > 0:
+        tenant.monthly_token_budget += add_budget
+
+    # 物理持久化至 SQLite
+    try:
+        with _get_db() as conn:
+            conn.execute(
+                "UPDATE tenants SET tokens_consumed = ?, monthly_token_budget = ? WHERE tenant_id = ?",
+                (tenant.tokens_consumed, tenant.monthly_token_budget, tenant_id)
+            )
+            conn.commit()
+    except Exception as e:
+        print(f"[Warn] Reset tenant quota SQLite failed: {e}")
+
+    remaining = max(0, tenant.monthly_token_budget - tenant.tokens_consumed)
+    is_exhausted = tenant.tokens_consumed >= tenant.monthly_token_budget
+
+    return {
+        "tenant_id": tenant.tenant_id,
+        "tenant_name": tenant.tenant_name,
+        "tokens_consumed": tenant.tokens_consumed,
+        "monthly_token_budget": tenant.monthly_token_budget,
+        "tokens_remaining": remaining,
+        "is_exhausted": is_exhausted
+    }
+
+
 def get_role_permissions_matrix() -> Dict[str, Any]:
     """获取系统角色权限矩阵"""
     return ROLE_PERMISSIONS_MATRIX

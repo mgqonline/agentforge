@@ -686,6 +686,7 @@ try:
         get_user_progress_map,
         get_billing_summary,
         generate_billing_csv_content,
+        reset_tenant_quota,
     )
 except ImportError:
     from auth_governance import (
@@ -711,6 +712,7 @@ except ImportError:
         get_user_progress_map,
         get_billing_summary,
         generate_billing_csv_content,
+        reset_tenant_quota,
     )
 
 def resolve_tenant_context(
@@ -864,6 +866,33 @@ async def api_switch_tenant(
             "is_exhausted": target_tenant.tokens_consumed >= target_tenant.monthly_token_budget,
         }
     }
+
+class ResetTenantQuotaRequest(BaseModel):
+    tenant_id: str
+    new_consumed: Optional[int] = 0
+    add_budget: Optional[int] = 0
+
+@app.post("/api/v1/tenants/reset-quota")
+async def api_reset_tenant_quota(
+    req: ResetTenantQuotaRequest,
+    authorization: Optional[str] = Header(None),
+    x_tenant_id: Optional[str] = Header(None)
+):
+    """一键重置或增补租户 Token 配额 (用于沙箱调试、演示与紧急恢复)"""
+    ctx = resolve_tenant_context(authorization, x_tenant_id)
+    updated = reset_tenant_quota(
+        tenant_id=req.tenant_id,
+        new_consumed=req.new_consumed or 0,
+        add_budget=req.add_budget or 0
+    )
+    record_user_action(
+        username=getattr(ctx, "username", "admin"),
+        tenant_id=req.tenant_id,
+        action="tenant_quota_reset",
+        user_id=getattr(ctx, "user_id", "usr_superadmin_01"),
+        details=f"重置租户 [{req.tenant_id}] 消耗水位为 {req.new_consumed}，增补额度: {req.add_budget}"
+    )
+    return {"status": "success", "tenant": updated}
 
 @app.get("/api/v1/governance/users")
 async def api_governance_list_users(

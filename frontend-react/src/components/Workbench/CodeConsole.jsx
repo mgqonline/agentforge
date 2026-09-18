@@ -910,6 +910,62 @@ export default function CodeConsole({
     }
   };
 
+  // 将 Python 报错 Traceback 中的行号智能渲染为可点击交互直达组件
+  const renderInteractiveStderr = (stderrText, customStyle = {}) => {
+    if (!stderrText) return null;
+    const lines = stderrText.split('\n');
+    return (
+      <div style={{ ...customStyle, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
+        {lines.map((line, idx) => {
+          // 匹配常见 Python 报错堆栈: File "...", line 123
+          const match = line.match(/^(.*File\s+["'][^"']+["'],\s+line\s+)(\d+)(.*)$/i);
+          if (match) {
+            const prefix = match[1];
+            const lineNum = parseInt(match[2], 10);
+            const suffix = match[3];
+            return (
+              <div key={idx} style={{ lineHeight: 1.55 }}>
+                <span>{prefix}</span>
+                <span
+                  onClick={() => jumpToLine(lineNum)}
+                  title={`点击直达 Monaco 编辑器第 ${lineNum} 行`}
+                  style={{
+                    color: '#38bdf8',
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                    padding: '1px 4px',
+                    margin: '0 2px',
+                    backgroundColor: 'rgba(56, 189, 248, 0.16)',
+                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                    borderRadius: '3px',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.3)';
+                    e.currentTarget.style.color = '#7dd3fc';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.16)';
+                    e.currentTarget.style.color = '#38bdf8';
+                  }}
+                >
+                  {lineNum} ➔
+                </span>
+                <span>{suffix}</span>
+              </div>
+            );
+          }
+          return (
+            <div key={idx} style={{ lineHeight: 1.55 }}>
+              {line}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   // 处理多模态报错截图上传
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
@@ -2715,9 +2771,9 @@ export default function CodeConsole({
                             </pre>
                           )}
                           {filteredStderr && (
-                            <pre style={{ margin: filteredStdout ? '6px 0 0' : 0, color: '#fb7185', whiteSpace: 'pre-wrap', fontSize: '12px' }}>
-                              {filteredStderr}
-                            </pre>
+                            <div style={{ margin: filteredStdout ? '6px 0 0' : 0, color: '#fb7185', fontSize: '12px' }}>
+                              {renderInteractiveStderr(filteredStderr)}
+                            </div>
                           )}
                         </>
                       );
@@ -2811,9 +2867,9 @@ export default function CodeConsole({
                       </pre>
                     )}
                     {verifyResult.details?.stderr && (
-                      <pre style={{ color: '#fb7185', fontSize: '11.5px', whiteSpace: 'pre-wrap', marginTop: '4px' }}>
-                        {verifyResult.details.stderr}
-                      </pre>
+                      <div style={{ color: '#fb7185', fontSize: '11.5px', marginTop: '4px' }}>
+                        {renderInteractiveStderr(verifyResult.details.stderr)}
+                      </div>
                     )}
 
                     {/* 💡 测试未通过时的 AI 导师启发式排障支架卡片 */}

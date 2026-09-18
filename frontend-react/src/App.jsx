@@ -277,6 +277,37 @@ export default function App() {
     }
   };
 
+  const handleResetTenantQuota = async (tenantId, newConsumed = 0, addBudget = 0) => {
+    try {
+      const token = localStorage.getItem('agentforge_jwt_token');
+      const res = await fetch('/api/v1/tenants/reset-quota', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+          'X-Tenant-Id': tenantId
+        },
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          new_consumed: newConsumed,
+          add_budget: addBudget
+        })
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        if (data.tenant && currentTenant?.tenant_id === tenantId) {
+          setCurrentTenant(data.tenant);
+        }
+        await fetchTenantContext();
+        return { success: true, message: data.message, tenant: data.tenant };
+      } else {
+        return { success: false, message: data.detail || '重置失败' };
+      }
+    } catch (e) {
+      return { success: false, message: e.message };
+    }
+  };
+
   // 从后端获取 24 阶段列表
   useEffect(() => {
     fetch('/api/v1/curriculum/phases')
@@ -413,6 +444,7 @@ export default function App() {
         currentUser={currentUser}
         tenantsList={tenantsList}
         onSwitchTenant={handleSwitchTenant}
+        onResetTenantQuota={handleResetTenantQuota}
         onOpenGovernance={() => setIsGovernanceOpen(true)}
         onOpenKnowledge={() => setIsKnowledgeOpen(true)}
         onOpenLogin={() => setIsLoginOpen(true)}
