@@ -25,21 +25,21 @@ const DOMAIN_CONFIG = [
     name: 'Agent 智能体与状态图',
     icon: BrainCircuit,
     description: 'LangGraph 循环图、长短期记忆认知、多智能体协同编排',
-    phaseIds: ['03-mcp', '06-agent-basics', '07-advanced-memory', '15-agent-architecture', '20-agent-frameworks', '21-multi-agent-scale']
+    phaseIds: ['03-mcp', '06-agent-basics', '07-advanced-memory', '15-agent-architecture', '21-agent-frameworks', '22-multi-agent-scale']
   },
   {
     id: 'llmops_serving',
     name: 'LLMOps 推理与微调',
     icon: Target,
     description: 'Transformers 注意力机制、vLLM 推理加速、LoRA 微调与端侧部署',
-    phaseIds: ['17-transformers-basics', '18-inference-serving', '19-model-finetuning', '23-edge-ai']
+    phaseIds: ['17-transformers-basics', '18-inference-serving', '19-model-finetuning', '24-edge-ai']
   },
   {
     id: 'ai_security',
     name: 'AI 安全治理与评测',
     icon: ShieldCheck,
     description: 'Ragas 量化评估、提示词注入防御、安全护栏与红蓝对抗',
-    phaseIds: ['09-evaluation', '22-ai-security']
+    phaseIds: ['09-evaluation', '23-ai-security']
   },
   {
     id: 'infra_backend',

@@ -42,11 +42,11 @@ const FALLBACK_PHASES = [
   { id: '17-transformers-basics', order: 17, title: 'Transformers 核心架构与注意力机制', slug: 'transformers-basics', description: 'Self-Attention 计算、Positional Encoding 与前向传播', tags: ['Transformer', 'Math'], difficulty: 'Advanced' },
   { id: '18-inference-serving', order: 18, title: '大模型推理加速与 vLLM 部署', slug: 'inference-serving', description: 'PagedAttention、KV Cache 显存优化与流式并发服务', tags: ['Serving', 'vLLM'], difficulty: 'Advanced' },
   { id: '19-model-finetuning', order: 19, title: 'LoRA / QLoRA 领域微调实战', slug: 'model-finetuning', description: 'PEFT 参数高效微调、量化加载与指令微调数据集构建', tags: ['Finetune', 'LoRA'], difficulty: 'Advanced' },
-  { id: '20-agent-frameworks', order: 20, title: '多 Agent 协同与 AutoGen 框架', slug: 'agent-frameworks', description: '多智能体对话、角色分工与群聊编排模式', tags: ['Multi-Agent', 'AutoGen'], difficulty: 'Advanced' },
-  { id: '20-graph-rag', order: 21, title: '知识图谱与 Graph RAG 融合', slug: 'graph-rag', description: '实体关系抽取、图检索与语义互联增强', tags: ['Graph', 'RAG'], difficulty: 'Advanced' },
-  { id: '21-multi-agent-scale', order: 22, title: '大规模多智能体编排与调度', slug: 'multi-agent-scale', description: '层次化拓扑、冲突裁决与任务容错编排', tags: ['Scale', 'Multi-Agent'], difficulty: 'Advanced' },
-  { id: '22-ai-security', order: 23, title: 'AI 安全风控与提示词注入防御', slug: 'ai-security', description: '红蓝对抗、越狱防御、敏感信息脱敏与护栏策略', tags: ['Security', 'Safety'], difficulty: 'Advanced' },
-  { id: '23-edge-ai', order: 24, title: '端侧 AI 部署与移动端量化压缩', slug: 'edge-ai', description: 'ONNX Runtime、TensorRT 与端侧极速推理落地', tags: ['Edge', 'Mobile'], difficulty: 'Advanced' }
+  { id: '20-graph-rag', order: 20, title: '知识图谱增强检索与拓扑推理 (Graph RAG)', slug: 'graph-rag', description: '实体关系抽取、图检索与语义互联增强', tags: ['Graph', 'RAG'], difficulty: 'Advanced' },
+  { id: '21-agent-frameworks', order: 21, title: '工业级智能体框架演进 (LangGraph / AutoGen)', slug: 'agent-frameworks', description: '多智能体对话、角色分工与群聊编排模式', tags: ['Multi-Agent', 'AutoGen'], difficulty: 'Advanced' },
+  { id: '22-multi-agent-scale', order: 22, title: '大规模多智能体编排与分布式调度', slug: 'multi-agent-scale', description: '层次化拓扑、冲突裁决与任务容错编排', tags: ['Scale', 'Multi-Agent'], difficulty: 'Advanced' },
+  { id: '23-ai-security', order: 23, title: 'AI 安全风控与提示词注入防御', slug: 'ai-security', description: '红蓝对抗、越狱防御、敏感信息脱敏与护栏策略', tags: ['Security', 'Safety'], difficulty: 'Advanced' },
+  { id: '24-edge-ai', order: 24, title: '端侧 AI 与边缘设备本地推理加速 (Apple MLX)', slug: 'edge-ai', description: 'Apple MLX、统一内存优化与端侧极速推理落地', tags: ['Edge', 'Mobile'], difficulty: 'Advanced' }
 ];
 
 export default function App() {
