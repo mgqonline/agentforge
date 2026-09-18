@@ -196,3 +196,30 @@ async def trigger_reindex():
         return {"status": "success", "message": "知识库全量索引同步与重建已成功触发完成！"}
     except Exception as e:
         return {"status": "degraded", "message": f"知识库已更新，向量同步稍后重试: {str(e)}"}
+
+class RetrievalTestRequest(BaseModel):
+    query: str
+    top_k: Optional[int] = 5
+
+@router.post("/test-retrieval")
+async def test_knowledge_retrieval(req: RetrievalTestRequest):
+    """
+    RAG 即时检索演练器 (Playground)
+    输入测试 Query，即时调用 BM25 + BGE-M3 混合检索，返回召回切片、来源文档与特征权重
+    """
+    if not req.query or not req.query.strip():
+        raise HTTPException(status_code=400, detail="查询内容不能为空")
+    
+    start_t = time.time()
+    try:
+        from rag_engine import rag_engine
+        detail = rag_engine.retrieve_detailed(req.query.strip(), k=req.top_k or 5)
+        elapsed_ms = round((time.time() - start_t) * 1000, 1)
+        detail["latency_ms"] = elapsed_ms
+        return {
+            "status": "success",
+            "data": detail
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"检索演练失败: {str(e)}")
+

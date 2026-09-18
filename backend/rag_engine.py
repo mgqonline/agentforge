@@ -60,11 +60,27 @@ class RAGEngine:
                     hash_md5.update(chunk)
             return hash_md5.hexdigest()
             
+        conn = None
+        cursor = None
         try:
             conn = psycopg2.connect(dbname="ailearning", user="aiuser", password="aipassword", host="localhost", port="5432")
             cursor = conn.cursor()
         except Exception as e:
-            print("[RAG] 无法连接到 Postgres:", e)
+            print("[RAG] 外部 Postgres 离线，无缝切换为本地 Chroma + BM25 持久化轻量加载模式:", e)
+            vectorstore = Chroma(persist_directory=self.persist_dir, embedding_function=self.embeddings)
+            self.chroma_retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+            import pickle
+            bm25_path = os.path.join(self.persist_dir, 'bm25.pickle')
+            if os.path.exists(bm25_path):
+                with open(bm25_path, 'rb') as f:
+                    self.bm25_retriever = pickle.load(f)
+            else:
+                dummy_docs = [Document(page_content="系统极速自愈启动，知识库就绪。", metadata={"source": "system"})]
+                self.bm25_retriever = BM25Retriever.from_documents(dummy_docs)
+            self.ensemble_retriever = EnsembleRetriever(
+                retrievers=[self.bm25_retriever, self.chroma_retriever],
+                weights=[0.5, 0.5]
+            )
             return
             
         cursor.execute("SELECT filepath, md5_hash FROM document_hashes")
@@ -256,4 +272,49 @@ class RAGEngine:
         context = "\n\n".join([f"[{d.metadata.get('type', 'doc').upper()} - {d.metadata.get('source', 'Unknown')}] {d.page_content}" for d in unique_docs])
         return context, sources
 
+    def retrieve_detailed(self, query: str, k: int = 5):
+        """面向 RAG 演练器提供结构化切片召回元数据、权重诊断与文档溯源"""
+        if self.ensemble_retriever is None:
+            self.build_or_load()
+            
+        dense_w, sparse_w, diagnostics = dfl_fusion.calculate_dynamic_weights(query)
+        self.ensemble_retriever.weights = [sparse_w, dense_w]
+        
+        try:
+            results = self.ensemble_retriever.invoke(query)
+        except Exception as e:
+            results = []
+            print(f"[RAG Playground] 检索异常: {e}")
+            
+        chunks = []
+        seen = set()
+        for d in results:
+            content = d.page_content.strip()
+            if not content or content in seen:
+                continue
+            seen.add(content)
+            src = d.metadata.get("source", "Unknown")
+            basename = os.path.basename(src)
+            chunks.append({
+                "rank": len(chunks) + 1,
+                "source": basename,
+                "type": d.metadata.get("type", "doc").upper(),
+                "content": content,
+                "preview": content[:260] + ("..." if len(content) > 260 else ""),
+                "length": len(content),
+                "metadata": d.metadata
+            })
+            if len(chunks) >= k:
+                break
+                
+        return {
+            "query": query,
+            "dense_weight": dense_w,
+            "sparse_weight": sparse_w,
+            "diagnostics": diagnostics,
+            "total_recalled": len(chunks),
+            "chunks": chunks
+        }
+
 rag_engine = RAGEngine()
+

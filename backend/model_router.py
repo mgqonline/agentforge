@@ -266,5 +266,67 @@ class ModelFailoverRouter:
             f"🚨 [ModelRouter] 多路全线路调用皆失败，最后捕获异常: {last_exception}"
         ) from last_exception
 
+    async def ping_provider(self, provider_id: str) -> Dict[str, Any]:
+        """向指定模型节点发送网络连通性探测并返回实时延迟"""
+        node = next((p for p in self.providers if p.id == provider_id), None)
+        if not node:
+            raise ValueError(f"未找到节点: {provider_id}")
+
+        client = openai.AsyncOpenAI(
+            api_key=node.api_key,
+            base_url=node.base_url,
+            timeout=6.0
+        )
+        start_t = time.time()
+        try:
+            await client.models.list()
+            latency_ms = round((time.time() - start_t) * 1000, 1)
+            return {
+                "id": node.id,
+                "name": node.name,
+                "reachable": True,
+                "latency_ms": latency_ms,
+                "status": "online"
+            }
+        except Exception as e:
+            latency_ms = round((time.time() - start_t) * 1000, 1)
+            return {
+                "id": node.id,
+                "name": node.name,
+                "reachable": False,
+                "latency_ms": latency_ms,
+                "error": str(e),
+                "status": "degraded"
+            }
+
+    def inject_drill_fault(self, provider_id: str, action: str = "force_open") -> Dict[str, Any]:
+        """故障演练注入：模拟 429 熔断 (force_open) 或恢复 (recover)"""
+        node = next((p for p in self.providers if p.id == provider_id), None)
+        if not node:
+            raise ValueError(f"未找到节点: {provider_id}")
+
+        if action == "force_open":
+            node.state = CircuitState.OPEN
+            node.consecutive_failures = node.failure_threshold
+            node.last_failure_time = time.time()
+            node.last_error_msg = "⚠️ [稳定性演练] 人工注入 429 RateLimit 触发熔断保护"
+            node.total_failures += 1
+            logger.warning(f"🔴 [稳定性演练] 已人工将节点 [{node.name}] 切换为 OPEN 熔断状态")
+        elif action == "recover":
+            node.state = CircuitState.CLOSED
+            node.consecutive_failures = 0
+            node.last_error_msg = ""
+            logger.info(f"🟢 [稳定性演练] 已人工将节点 [{node.name}] 恢复为 CLOSED 正常通路")
+        else:
+            raise ValueError(f"不支持的演练动作: {action}")
+
+        return {
+            "id": node.id,
+            "name": node.name,
+            "current_state": node.state.value,
+            "action": action
+        }
+
 # 全局单例路由器
 model_failover_router = ModelFailoverRouter()
+

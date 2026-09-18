@@ -989,6 +989,36 @@ async def api_models_status():
     """获取多模型主备高可用集群与熔断器健康指标"""
     return {"status": "success", "cluster": model_failover_router.get_cluster_status()}
 
+class PingModelRequest(BaseModel):
+    provider_id: str
+
+class FaultInjectRequest(BaseModel):
+    provider_id: str
+    action: str = "force_open"
+
+@app.post("/api/v1/models/ping")
+async def api_models_ping(req: PingModelRequest):
+    """探测指定大模型节点的网络连通性与往返延迟"""
+    try:
+        res = await model_failover_router.ping_provider(req.provider_id)
+        return {"status": "success", "ping": res}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/models/inject-fault")
+async def api_models_inject_fault(req: FaultInjectRequest):
+    """高可用故障演练注入：模拟 429 熔断切流或手动恢复正常通路"""
+    try:
+        res = model_failover_router.inject_drill_fault(req.provider_id, req.action)
+        return {
+            "status": "success", 
+            "drill": res,
+            "cluster": model_failover_router.get_cluster_status()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 
 @app.post("/api/v1/sandbox/run")
 async def api_sandbox_run(

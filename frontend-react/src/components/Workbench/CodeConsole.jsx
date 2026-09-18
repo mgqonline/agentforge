@@ -102,6 +102,10 @@ export default function CodeConsole({
   const completionDisposableRef = useRef(null);
   const hoverDisposableRef = useRef(null);
 
+  // 引用最新函数指针，供 Monaco 编辑器快捷键无缝调用
+  const handleRunCodeRef = useRef(null);
+  const handleSaveImmediatelyRef = useRef(null);
+
   // Monaco 编辑器挂载与智能代码方法提醒注册
   const handleEditorMount = (editor, monaco) => {
     editorInstanceRef.current = editor;
@@ -117,6 +121,18 @@ export default function CodeConsole({
     }
 
     try {
+      // 注册 Monaco 编辑器内原生快捷键：⌘Enter / Ctrl+Enter 运行代码，⌘S / Ctrl+S 暂存草稿
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+        if (handleRunCodeRef.current) {
+          handleRunCodeRef.current();
+        }
+      });
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+        if (handleSaveImmediatelyRef.current) {
+          handleSaveImmediatelyRef.current();
+        }
+      });
+
       // 1. 注册 Python 智能代码方法自动补全 Provider (全面支持 os. 等点号级命名空间精准联想)
       completionDisposableRef.current = monaco.languages.registerCompletionItemProvider('python', {
         triggerCharacters: ['.', '(', ' ', '_', '"', "'"],
@@ -147,6 +163,21 @@ export default function CodeConsole({
     } catch (e) {
       console.warn('Monaco completion provider registration notice:', e);
     }
+  };
+
+  // 一键将 AI 导师诊断报告中的推荐代码替换/回填到当前编辑器
+  const handleApplyMentorSnippet = (snippet) => {
+    if (!snippet || !snippet.trim()) return;
+    const cleanSnippet = snippet.trim();
+    // 自动备份当前草稿
+    try {
+      localStorage.setItem(`ai_learning_draft_backup_${phaseId}`, JSON.stringify({
+        code: code,
+        updatedAt: Date.now()
+      }));
+    } catch {}
+    handleCodeChange(cleanSnippet);
+    showToast('🚀 已将 AI 导师推荐代码应用到编辑区', () => handleRestoreBackup(code));
   };
 
   // 一键将标准代码方法模版注入编辑器光标处
@@ -559,6 +590,11 @@ export default function CodeConsole({
   };
 
   // 9. 全局快捷键监听 (⌘S 即时保存, ⌘Enter 运行)
+  useEffect(() => {
+    handleRunCodeRef.current = handleRunCode;
+    handleSaveImmediatelyRef.current = handleSaveImmediately;
+  });
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -2779,18 +2815,72 @@ export default function CodeConsole({
                               color: 'var(--wb-text-normal)'
                             }} {...props} />
                           ),
-                          pre: ({node, ...props}) => (
-                            <pre style={{
-                              background: 'var(--wb-bg-root)',
-                              border: '1px solid var(--wb-border-subtle)',
-                              borderRadius: '6px',
-                              padding: '8px 12px',
-                              overflowX: 'auto',
-                              fontFamily: 'var(--wb-font-mono)',
-                              fontSize: '11.5px',
-                              margin: '6px 0'
-                            }} {...props} />
-                          ),
+                          pre: ({node, children, ...props}) => {
+                            // 提取子元素中的纯文本代码内容
+                            let rawCode = '';
+                            try {
+                              const codeElement = React.Children.toArray(children)[0];
+                              if (codeElement && codeElement.props && codeElement.props.children) {
+                                rawCode = String(codeElement.props.children);
+                              } else {
+                                rawCode = String(children);
+                              }
+                            } catch {
+                              rawCode = String(children);
+                            }
+                            const isCodeBlock = rawCode && rawCode.trim().length > 0;
+
+                            return (
+                              <div style={{ position: 'relative', margin: '8px 0' }}>
+                                {isCodeBlock && (
+                                  <div style={{
+                                    position: 'absolute',
+                                    top: '6px',
+                                    right: '8px',
+                                    display: 'flex',
+                                    gap: '6px',
+                                    zIndex: 10
+                                  }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleApplyMentorSnippet(rawCode)}
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        background: 'rgba(59, 130, 246, 0.25)',
+                                        border: '1px solid rgba(59, 130, 246, 0.4)',
+                                        color: '#60a5fa',
+                                        fontSize: '10.5px',
+                                        padding: '2px 8px',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontWeight: 600,
+                                        transition: 'all 0.15s'
+                                      }}
+                                      title="一键将 AI 导师推荐的代码回填应用到编辑区 (自动备份当前草稿)"
+                                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.4)'}
+                                      onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.25)'}
+                                    >
+                                      <span>🚀 应用到编辑区</span>
+                                    </button>
+                                  </div>
+                                )}
+                                <pre style={{
+                                  background: 'var(--wb-bg-root)',
+                                  border: '1px solid var(--wb-border-subtle)',
+                                  borderRadius: '6px',
+                                  padding: '10px 12px',
+                                  overflowX: 'auto',
+                                  fontFamily: 'var(--wb-font-mono)',
+                                  fontSize: '11.5px',
+                                  margin: 0
+                                }} {...props}>
+                                  {children}
+                                </pre>
+                              </div>
+                            );
+                          },
                           code: ({node, className, children, ...props}) => {
                             const isBlock = String(children).includes('\n') || (className && className.includes('language-'));
                             return isBlock ? (

@@ -3,7 +3,8 @@ import {
   CheckCircle2, Search, LayoutGrid, Code2, 
   PanelLeft, PanelRight, Maximize2, Trophy,
   Building2, ShieldCheck, Zap, User, ChevronDown,
-  LogOut, Palette, Check, Database, Cpu, Network
+  LogOut, Palette, Check, Database, Cpu, Network,
+  AlertTriangle, RotateCcw, Activity
 } from 'lucide-react';
 import ThemeSwitcher from './ThemeSwitcher';
 
@@ -38,23 +39,74 @@ export default function HeaderBar({
   const [modelCluster, setModelCluster] = useState(null);
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const modelMenuRef = useRef(null);
+  const [pingLatencies, setPingLatencies] = useState({}); // { [nodeId]: latency_ms }
+  const [isPinging, setIsPinging] = useState(false);
+  const [isDrilling, setIsDrilling] = useState(false);
+
+  const fetchModelStatus = async () => {
+    try {
+      const res = await fetch('/api/v1/models/status');
+      const data = await res.json();
+      if (data.status === 'success') {
+        setModelCluster(data.cluster);
+      }
+    } catch (e) {
+      // 静默降级
+    }
+  };
 
   useEffect(() => {
-    const fetchModelStatus = async () => {
-      try {
-        const res = await fetch('/api/v1/models/status');
-        const data = await res.json();
-        if (data.status === 'success') {
-          setModelCluster(data.cluster);
-        }
-      } catch (e) {
-        // 静默降级
-      }
-    };
     fetchModelStatus();
     const timer = setInterval(fetchModelStatus, 12000);
     return () => clearInterval(timer);
   }, []);
+
+  // 线路健康与连通性测速
+  const handlePingNode = async (nodeId) => {
+    setIsPinging(true);
+    try {
+      const res = await fetch('/api/v1/models/ping', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider_id: nodeId })
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        setPingLatencies(prev => ({
+          ...prev,
+          [nodeId]: data.ping.latency_ms
+        }));
+      }
+    } catch (e) {
+      setPingLatencies(prev => ({ ...prev, [nodeId]: -1 }));
+    } finally {
+      setIsPinging(false);
+    }
+  };
+
+  // 故障演练注入 / 恢复
+  const handleToggleFault = async (nodeId, shouldFault) => {
+    setIsDrilling(true);
+    try {
+      const res = await fetch('/api/v1/models/inject-fault', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider_id: nodeId,
+          fault_type: shouldFault ? 'force_open' : 'recover',
+          duration_seconds: 60
+        })
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        await fetchModelStatus();
+      }
+    } catch (e) {
+      console.error('Fault drill failed:', e);
+    } finally {
+      setIsDrilling(false);
+    }
+  };
 
   // 点击外部自动收起下拉菜单
   useEffect(() => {
@@ -561,34 +613,101 @@ export default function HeaderBar({
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {modelCluster.nodes?.map(node => (
-                      <div key={node.id} style={{
-                        background: 'rgba(255, 255, 255, 0.02)',
-                        border: '1px solid rgba(255, 255, 255, 0.06)',
-                        borderRadius: '6px',
-                        padding: '8px 10px',
-                        fontSize: '11px'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ fontWeight: 600, color: 'var(--wb-text-bright, #fff)' }}>
-                            {node.priority === 1 ? '🥇 主线路: ' : '🥈 备用线路: '}{node.name}
+                    {modelCluster.nodes?.map(node => {
+                      const isFaulted = (node.state === 'OPEN');
+                      const latency = pingLatencies[node.id];
+
+                      return (
+                        <div key={node.id} style={{
+                          background: isFaulted ? 'rgba(239, 68, 68, 0.06)' : 'rgba(255, 255, 255, 0.02)',
+                          border: `1px solid ${isFaulted ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.06)'}`,
+                          borderRadius: '6px',
+                          padding: '8px 10px',
+                          fontSize: '11px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ fontWeight: 600, color: 'var(--wb-text-bright, #fff)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <span>{node.priority === 1 ? '🥇 主线路: ' : '🥈 备用线路: '}{node.name}</span>
+                              {latency !== undefined && (
+                                <span style={{
+                                  fontSize: '9.5px',
+                                  padding: '1px 5px',
+                                  borderRadius: '3px',
+                                  fontFamily: 'monospace',
+                                  background: latency < 0 ? 'rgba(239, 68, 68, 0.2)' : latency < 300 ? 'rgba(34, 197, 94, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+                                  color: latency < 0 ? '#f87171' : latency < 300 ? '#4ade80' : '#fbbf24'
+                                }}>
+                                  {latency < 0 ? '超时' : `${latency}ms`}
+                                </span>
+                              )}
+                            </div>
+                            <span style={{
+                              fontSize: '9px',
+                              padding: '1px 5px',
+                              borderRadius: '3px',
+                              fontWeight: 600,
+                              background: node.state === 'CLOSED' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                              color: node.state === 'CLOSED' ? '#4ade80' : '#f87171'
+                            }}>
+                              {node.state === 'CLOSED' ? 'NORMAL 闭合' : 'OPEN 熔断断开'}
+                            </span>
                           </div>
-                          <span style={{
-                            fontSize: '9px',
-                            padding: '1px 4px',
-                            borderRadius: '3px',
-                            background: node.state === 'CLOSED' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                            color: node.state === 'CLOSED' ? '#4ade80' : '#f87171'
-                          }}>
-                            {node.state}
-                          </span>
+
+                          <div style={{ fontSize: '10px', color: 'var(--wb-text-dim, #888)', display: 'flex', justifyContent: 'space-between' }}>
+                            <span>模型: {node.model_name}</span>
+                            <span>调用: {node.total_calls} 次 (切流: {node.total_fallovers})</span>
+                          </div>
+
+                          {/* 交互演练栏：线路测速 + 一键故障注入/恢复 */}
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', paddingTop: '4px', borderTop: '1px dashed rgba(255,255,255,0.06)' }}>
+                            <button
+                              onClick={() => handlePingNode(node.id)}
+                              disabled={isPinging}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                padding: '2px 7px',
+                                borderRadius: '4px',
+                                border: '1px solid rgba(59, 130, 246, 0.3)',
+                                background: 'rgba(59, 130, 246, 0.1)',
+                                color: '#60a5fa',
+                                fontSize: '10px',
+                                cursor: isPinging ? 'wait' : 'pointer'
+                              }}
+                              title="对当前线路发起心跳 Ping 测速"
+                            >
+                              <Activity size={10} />
+                              <span>{isPinging ? '测速中...' : '⚡ 线路测速'}</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleToggleFault(node.id, !isFaulted)}
+                              disabled={isDrilling}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                padding: '2px 7px',
+                                borderRadius: '4px',
+                                border: `1px solid ${isFaulted ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                                background: isFaulted ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                color: isFaulted ? '#4ade80' : '#f87171',
+                                fontSize: '10px',
+                                cursor: isDrilling ? 'wait' : 'pointer'
+                              }}
+                              title={isFaulted ? '恢复线路为正常状态' : '模拟注入 429 故障，触发主备自动倒换演练'}
+                            >
+                              {isFaulted ? <RotateCcw size={10} /> : <AlertTriangle size={10} />}
+                              <span>{isFaulted ? '🟢 恢复健康' : '🔴 模拟 429 故障'}</span>
+                            </button>
+                          </div>
                         </div>
-                        <div style={{ fontSize: '10px', color: 'var(--wb-text-dim, #888)', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
-                          <span>模型: {node.model_name}</span>
-                          <span>调用: {node.total_calls} 次 (切流: {node.total_fallovers})</span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   <div style={{
