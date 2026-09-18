@@ -1100,6 +1100,162 @@ class TestEdgeAIChallenge(unittest.TestCase):
 if __name__ == '__main__':
     unittest.main()
 """
+    },
+    "25-reasoning-rl": {
+        "mission_title": "实战挑战：实现 DeepSeek-R1 组相对优势计算 (GRPO Advantage Normalizer)",
+        "mission_goal": "编写 `compute_grpo_advantages(rewards)` 函数，对同一 Prompt 采样的多路候选轨迹的规则奖励打分进行组内标准化计算相对优势，彻底摆脱对巨大 Critic 价值网络的依赖。",
+        "requirements": [
+            "定义 `compute_grpo_advantages(rewards: list[float]) -> list[float]` 函数",
+            "准确计算组内均值 mean 与方差/标准差 std",
+            "根据 A_i = (R_i - mean) / (std + 1e-6) 计算每条轨迹的相对优势并四舍五入保留 4 位小数",
+            "具备边界处理：输入空列表返回 []，输入单元素返回 [0.0]"
+        ],
+        "learning_steps": [
+            "第 1 步：研读手册理解 DeepSeek-R1 采用 GRPO 替代传统 PPO 的数学机理；",
+            "第 2 步：在右侧编辑器中编写组内相对优势归一化函数；",
+            "第 3 步：点击【运行】观察在优质样本与劣质样本并存时的优势分布；",
+            "第 4 步：点击【验证通关】通过单元测试并获取通关认证！"
+        ],
+        "acceptance_criteria": "单元测试将传入不同奖励组合（包含相同得分与极值差异），断言优势数值分布、正负倾向与除零保护。",
+        "hint": "利用 math.sqrt 计算标准差，并加入 1e-6 极小值 eps 避免全组同分时的 ZeroDivisionError。",
+        "starter_code": """# ==========================================
+# 🎯 本关闯关实战任务：
+# 请实现 compute_grpo_advantages 函数，对同一采样组的奖励列表计算相对优势
+# 公式: A_i = (R_i - mean(R)) / (std(R) + 1e-6)
+# ==========================================
+import math
+
+def compute_grpo_advantages(rewards: list[float]) -> list[float]:
+    \"\"\"计算 GRPO 组相对策略优化的轨迹优势分布\"\"\"
+    # 请在下方编写你的实现代码:
+    pass
+
+if __name__ == "__main__":
+    test_rewards = [1.0, 0.7, 0.3, 0.5]
+    print(">>> 自测轨迹相对优势计算:")
+    print(compute_grpo_advantages(test_rewards))
+""",
+        "solution_code": """# ==========================================
+# 💡 官方标准参考实现 (工业级高可靠版本)
+# ==========================================
+import math
+
+def compute_grpo_advantages(rewards: list[float]) -> list[float]:
+    \"\"\"计算 GRPO 组相对策略优化的轨迹优势分布\"\"\"
+    if not rewards:
+        return []
+    n = len(rewards)
+    if n == 1:
+        return [0.0]
+    
+    mean_r = sum(rewards) / n
+    variance = sum((r - mean_r) ** 2 for r in rewards) / n
+    std_r = math.sqrt(variance)
+    eps = 1e-6
+    
+    return [round((r - mean_r) / (std_r + eps), 4) for r in rewards]
+
+if __name__ == "__main__":
+    print(compute_grpo_advantages([1.0, 0.7, 0.3, 0.5]))
+""",
+        "test_code": """import unittest
+
+class TestGRPOChallenge(unittest.TestCase):
+    def test_func_exists(self):
+        self.assertTrue('compute_grpo_advantages' in globals(), "必须定义 compute_grpo_advantages 函数")
+
+    def test_empty_and_single(self):
+        func = globals()['compute_grpo_advantages']
+        self.assertEqual(func([]), [])
+        self.assertEqual(func([1.0]), [0.0])
+
+    def test_relative_spread(self):
+        func = globals()['compute_grpo_advantages']
+        advs = func([1.0, 0.7, 0.3, 0.5])
+        self.assertEqual(len(advs), 4)
+        self.assertGreater(advs[0], 0, "最高奖励的轨迹优势必须为正")
+        self.assertLess(advs[2], 0, "最低奖励的轨迹优势必须为负")
+        self.assertAlmostEqual(sum(advs), 0.0, places=2)
+
+if __name__ == '__main__':
+    unittest.main()
+"""
+    },
+    "26-hybrid-search-rerank": {
+        "mission_title": "实战挑战：实现工业级倒排倒数融合算法 (Reciprocal Rank Fusion - RRF)",
+        "mission_goal": "编写 `reciprocal_rank_fusion(ranked_lists, k=60)` 函数，将词法检索与语义向量检索的候选结果按排位无量纲融合，解决异构打分尺度不一的难题。",
+        "requirements": [
+            "定义 `reciprocal_rank_fusion(ranked_lists: list, k: int = 60) -> list[tuple[str, float]]` 函数",
+            "遍历每个排序列表，按公式 `score += 1.0 / (k + rank)` 累加各个 doc_id 的 RRF 分数",
+            "返回按融合分数降序排列的元组列表 `[(doc_id, score), ...]`，分数值保留 6 位小数",
+            "支持多路召回列表输入，且不改变原列表顺序"
+        ],
+        "learning_steps": [
+            "第 1 步：阅读知识手册理解为什么不能对 BM25 和 Dense 向量余弦分数直接线性加权；",
+            "第 2 步：实现 RRF 倒排排位加权映射字典；",
+            "第 3 步：运行自测查看在两路召回均排第一的文档是否稳获最高融合排位；",
+            "第 4 步：点击【验证通关】完成自动化测试评测点亮徽章！"
+        ],
+        "acceptance_criteria": "测试集将模拟 BM25 词法与向量两路排序列表，断言双通道排名前列的文档获得绝对优势排序。",
+        "hint": "遍历排名时注意 rank 从 1 开始枚举，利用 dict.get(doc_id, 0.0) 累加得分后使用 sorted 进行降序排序。",
+        "starter_code": """# ==========================================
+# 🎯 本关闯关实战任务：
+# 请实现 reciprocal_rank_fusion 函数，对多路检索结果进行 RRF 倒排排位融合
+# 公式: RRF_Score(d) = sum_{m in models} 1.0 / (k + rank_m(d))
+# ==========================================
+
+def reciprocal_rank_fusion(ranked_lists: list, k: int = 60) -> list:
+    \"\"\"实现无量纲差异的多路召回 RRF 融合排序\"\"\"
+    # 请在下方编写你的实现代码:
+    pass
+
+if __name__ == "__main__":
+    # 模拟 BM25 与 Dense 两路检索结果: [(doc_id, score)]
+    list_bm25 = [("DOC_001", 12.5), ("DOC_002", 8.3)]
+    list_dense = [("DOC_001", 0.89), ("DOC_003", 0.74)]
+    print(">>> RRF 融合测试结果:")
+    print(reciprocal_rank_fusion([list_bm25, list_dense], k=60))
+""",
+        "solution_code": """# ==========================================
+# 💡 官方标准参考实现 (工业级高可靠版本)
+# ==========================================
+
+def reciprocal_rank_fusion(ranked_lists: list, k: int = 60) -> list:
+    \"\"\"实现无量纲差异的多路召回 RRF 融合排序\"\"\"
+    scores = {}
+    for r_list in ranked_lists:
+        for rank, (doc_id, _) in enumerate(r_list, 1):
+            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k + rank)
+            
+    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    return [(doc_id, round(score, 6)) for doc_id, score in sorted_scores]
+
+if __name__ == "__main__":
+    list_bm25 = [("DOC_001", 12.5), ("DOC_002", 8.3)]
+    list_dense = [("DOC_001", 0.89), ("DOC_003", 0.74)]
+    print(reciprocal_rank_fusion([list_bm25, list_dense], k=60))
+""",
+        "test_code": """import unittest
+
+class TestRRFChallenge(unittest.TestCase):
+    def test_func_exists(self):
+        self.assertTrue('reciprocal_rank_fusion' in globals(), "必须定义 reciprocal_rank_fusion 函数")
+
+    def test_rrf_scoring(self):
+        func = globals()['reciprocal_rank_fusion']
+        l1 = [("D1", 10.0), ("D2", 5.0)]
+        l2 = [("D1", 0.9), ("D3", 0.8)]
+        res = func([l1, l2], k=60)
+        
+        self.assertEqual(res[0][0], "D1", "双通道第一的文档必须在 RRF 中排第一")
+        # 1/61 + 1/61 = 2/61 ≈ 0.032787
+        expected_top = round(2.0 / 61.0, 6)
+        self.assertAlmostEqual(res[0][1], expected_top, places=5)
+        self.assertEqual(len(res), 3)
+
+if __name__ == '__main__':
+    unittest.main()
+"""
     }
 }
 
@@ -1129,6 +1285,8 @@ PREREQUISITES_MAP = {
     "22-multi-agent-scale": ["21-agent-frameworks"],
     "23-ai-security": ["03-mcp"],
     "24-edge-ai": ["18-inference-serving"],
+    "25-reasoning-rl": ["17-transformers-basics", "19-model-finetuning"],
+    "26-hybrid-search-rerank": ["04-rag", "05-embedding"],
 }
 
 class CurriculumEngine:
@@ -1220,6 +1378,24 @@ class CurriculumEngine:
                 else:
                     tags.extend(["AI-Core", "Practical"])
 
+                # 精细化初、中、高级三级进阶分层体系
+                beginner_phases = {
+                    "01-prompt-engineering", "02-function-calling", "03-mcp",
+                    "04-rag", "05-embedding", "11-python-advanced"
+                }
+                intermediate_phases = {
+                    "06-agent-basics", "07-advanced-memory", "08-multimodal",
+                    "09-evaluation", "10-production", "12-fastapi-advanced",
+                    "13-sqlalchemy-advanced", "14-celery-advanced", "15-agent-architecture",
+                    "21-agent-frameworks", "26-hybrid-search-rerank"
+                }
+                if entry in beginner_phases:
+                    diff_level = "Beginner"
+                elif entry in intermediate_phases:
+                    diff_level = "Intermediate"
+                else:
+                    diff_level = "Advanced"
+
                 phases.append({
                     "id": entry,
                     "order": order_num,
@@ -1227,7 +1403,7 @@ class CurriculumEngine:
                     "slug": slug,
                     "description": description,
                     "tags": tags,
-                    "difficulty": "Advanced" if order_num > 16 else "Intermediate" if order_num > 5 else "Beginner",
+                    "difficulty": diff_level,
                     "prerequisites": PREREQUISITES_MAP.get(entry, []),
                     "is_locked": False,
                 })

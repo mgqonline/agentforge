@@ -21,10 +21,13 @@ export default function CurriculumNav({
   onSelectPhase = () => {}
 }) {
   const [filterText, setFilterText] = useState('');
+  const [selectedDifficulty, setSelectedDifficulty] = useState('ALL'); // ALL, Beginner, Intermediate, Advanced
 
   const filteredPhases = phases.filter(p => {
-    return p.title.toLowerCase().includes(filterText.toLowerCase()) || 
-           p.id.toLowerCase().includes(filterText.toLowerCase());
+    const matchesText = p.title.toLowerCase().includes(filterText.toLowerCase()) || 
+                       p.id.toLowerCase().includes(filterText.toLowerCase());
+    const matchesDiff = selectedDifficulty === 'ALL' || p.difficulty === selectedDifficulty;
+    return matchesText && matchesDiff;
   });
 
   const handleItemClick = (phase) => {
@@ -110,6 +113,41 @@ export default function CurriculumNav({
         </button>
       </div>
 
+      {/* 阶梯进阶分级筛选胶囊 (初/中/高) */}
+      <div style={{
+        padding: '6px 8px',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: '4px',
+        borderBottom: '1px solid var(--wb-border-subtle)',
+        background: 'rgba(0, 0, 0, 0.12)'
+      }}>
+        {[
+          { key: 'ALL', label: '全部' },
+          { key: 'Beginner', label: '🟢初级' },
+          { key: 'Intermediate', label: '🟡中级' },
+          { key: 'Advanced', label: '🔴高级' }
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setSelectedDifficulty(tab.key)}
+            style={{
+              padding: '3px 0',
+              fontSize: '10px',
+              fontWeight: selectedDifficulty === tab.key ? 600 : 400,
+              border: `1px solid ${selectedDifficulty === tab.key ? 'var(--wb-accent-primary)' : 'transparent'}`,
+              background: selectedDifficulty === tab.key ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
+              color: selectedDifficulty === tab.key ? 'var(--wb-text-bright)' : 'var(--wb-text-dim)',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* 极简列表条目 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '6px 8px' }} className="wb-custom-scroll">
         <div style={{
@@ -118,9 +156,16 @@ export default function CurriculumNav({
           fontWeight: 600,
           textTransform: 'uppercase',
           padding: '4px 6px',
+          display: 'flex',
+          justifyContent: 'space-between',
           letterSpacing: '0.04em'
         }}>
-          实战路线 ({filteredPhases.length})
+          <span>实战路线 ({filteredPhases.length})</span>
+          {selectedDifficulty !== 'ALL' && (
+            <span style={{ fontSize: '10px', color: 'var(--wb-accent-primary)' }}>
+              {selectedDifficulty}
+            </span>
+          )}
         </div>
 
         {filteredPhases.map((phase) => {
@@ -128,6 +173,13 @@ export default function CurriculumNav({
           const isDone = Boolean(completedPhases[phase.id]?.passed || completedPhases[phase.id]);
           const isUnlocked = isPhaseUnlocked(phase.id);
           const cleanTitle = formatPhaseTitle(phase.title);
+
+          const diffColor = phase.difficulty === 'Beginner'
+            ? '#22c55e'
+            : phase.difficulty === 'Intermediate'
+              ? '#eab308'
+              : '#ef4444';
+          const diffShort = phase.difficulty === 'Beginner' ? '初' : phase.difficulty === 'Intermediate' ? '中' : '高';
 
           return (
             <div
@@ -140,7 +192,7 @@ export default function CurriculumNav({
               }}
               title={!isUnlocked && isChallengeMode ? `${cleanTitle}（前置未完成，可自由查阅演练）` : cleanTitle}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
                 <span style={{
                   fontSize: '11px',
                   fontFamily: 'var(--wb-font-mono)',
@@ -150,11 +202,26 @@ export default function CurriculumNav({
                 }}>
                   {String(phase.order).padStart(2, '0')}
                 </span>
+
+                <span style={{
+                  fontSize: '9px',
+                  lineHeight: '13px',
+                  padding: '1px 3px',
+                  borderRadius: '3px',
+                  color: diffColor,
+                  border: `1px solid ${diffColor}44`,
+                  background: `${diffColor}15`,
+                  flexShrink: 0,
+                  fontWeight: 600
+                }}>
+                  {diffShort}
+                </span>
+
                 <span style={{
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
-                  fontSize: '12.5px',
+                  fontSize: '12px',
                   fontWeight: isActive ? 600 : 400,
                   color: isActive ? 'var(--wb-text-bright)' : (!isUnlocked && isChallengeMode) ? 'var(--wb-text-dim)' : undefined
                 }}>
@@ -162,7 +229,7 @@ export default function CurriculumNav({
                 </span>
               </div>
 
-              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', marginLeft: '6px' }}>
                 {isDone ? (
                   <CheckCircle2 size={13} color="#22c55e" />
                 ) : !isUnlocked && isChallengeMode ? (
