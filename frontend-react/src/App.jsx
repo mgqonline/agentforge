@@ -23,30 +23,37 @@ export function formatPhaseTitle(title) {
 }
 
 const FALLBACK_PHASES = [
-  { id: '01-prompt-engineering', order: 1, title: 'Prompt 工程基础与进阶', slug: 'prompt-engineering', description: '系统提示词、思维链 CoT、少样本 Few-Shot 与提示词工程化', tags: ['Prompt', 'NLP'], difficulty: 'Beginner' },
-  { id: '02-function-calling', order: 2, title: 'Function Calling 工具调用', slug: 'function-calling', description: '结构化输出、函数参数校验与外部 API 自动化调用', tags: ['Tool', 'API'], difficulty: 'Beginner' },
-  { id: '03-mcp', order: 3, title: 'MCP 模型上下文协议实战', slug: 'mcp', description: 'Anthropic Model Context Protocol 协议与跨进程通信', tags: ['MCP', 'Protocol'], difficulty: 'Intermediate' },
-  { id: '04-rag', order: 4, title: 'RAG 知识库检索增强生成', slug: 'rag', description: '向量数据库 Chroma、分块策略、混合重排与防幻觉检验', tags: ['RAG', 'VectorDB'], difficulty: 'Intermediate' },
-  { id: '05-embedding', order: 5, title: 'Embedding 向量化与语义相似度', slug: 'embedding', description: '稠密与稀疏向量、余弦相似度计算与语义聚类', tags: ['NLP', 'Vector'], difficulty: 'Beginner' },
-  { id: '06-agent-basics', order: 6, title: 'LangGraph 循环状态 Agent', slug: 'agent-basics', description: 'StateGraph 编排、条件边路由与工具节点循环执行', tags: ['Agent', 'LangGraph'], difficulty: 'Intermediate' },
-  { id: '07-advanced-memory', order: 7, title: 'Agent 深度长短期记忆架构', slug: 'advanced-memory', description: '长短期记忆、会话摘要压缩、用户画像与认知状态', tags: ['Memory', 'Agent'], difficulty: 'Intermediate' },
-  { id: '08-multimodal', order: 8, title: '多模态理解与图文交互', slug: 'multimodal', description: '视觉大模型、图片分析、语音交互与文档 OCR', tags: ['Vision', 'Audio'], difficulty: 'Intermediate' },
-  { id: '09-evaluation', order: 9, title: 'Ragas 评测与 LangSmith 观测', slug: 'evaluation', description: '忠实度、答案相关性量化评估与全链路 Trace 追踪', tags: ['Eval', 'Tracing'], difficulty: 'Intermediate' },
-  { id: '10-production', order: 10, title: '生产级实战与高并发网关', slug: 'production', description: '流式输出、HITL 人机协同审批与语义缓存优化', tags: ['Prod', 'FastAPI'], difficulty: 'Advanced' },
-  { id: '11-python-advanced', order: 11, title: 'Python 高级特性与并发编程', slug: 'python-advanced', description: '异步 asyncio、元编程、生成器与底层优化', tags: ['Python', 'Async'], difficulty: 'Intermediate' },
-  { id: '12-fastapi-advanced', order: 12, title: 'FastAPI 高性能接口设计', slug: 'fastapi-advanced', description: '依赖注入、生命周期 lifespan 与中间件安全控制', tags: ['Backend', 'FastAPI'], difficulty: 'Intermediate' },
-  { id: '13-sqlalchemy-advanced', order: 13, title: '异步 SQLAlchemy 与数据库治理', slug: 'sqlalchemy-advanced', description: '连接池优化、异步迁移与模型映射最佳实践', tags: ['Database', 'ORM'], difficulty: 'Intermediate' },
-  { id: '14-celery-advanced', order: 14, title: 'Celery 分布式任务队列', slug: 'celery-advanced', description: 'Redis 消息代理、异步解耦与任务超时重试机制', tags: ['Queue', 'Distributed'], difficulty: 'Intermediate' },
-  { id: '15-agent-architecture', order: 15, title: '企业级 Agent 架构深度解构', slug: 'agent-architecture', description: 'Plan-and-Solve、ReAct 范式演进与任务分解', tags: ['Agent', 'Architecture'], difficulty: 'Advanced' },
-  { id: '16-face-recognition', order: 16, title: '计算机视觉与人脸特征提取', slug: 'face-recognition', description: 'OpenCV 与深度特征比对、人脸活体检测实战', tags: ['CV', 'Vision'], difficulty: 'Intermediate' },
-  { id: '17-transformers-basics', order: 17, title: 'Transformers 核心架构与注意力机制', slug: 'transformers-basics', description: 'Self-Attention 计算、Positional Encoding 与前向传播', tags: ['Transformer', 'Math'], difficulty: 'Advanced' },
-  { id: '18-inference-serving', order: 18, title: '大模型推理加速与 vLLM 部署', slug: 'inference-serving', description: 'PagedAttention、KV Cache 显存优化与流式并发服务', tags: ['Serving', 'vLLM'], difficulty: 'Advanced' },
-  { id: '19-model-finetuning', order: 19, title: 'LoRA / QLoRA 领域微调实战', slug: 'model-finetuning', description: 'PEFT 参数高效微调、量化加载与指令微调数据集构建', tags: ['Finetune', 'LoRA'], difficulty: 'Advanced' },
-  { id: '20-graph-rag', order: 20, title: '知识图谱增强检索与拓扑推理 (Graph RAG)', slug: 'graph-rag', description: '实体关系抽取、图检索与语义互联增强', tags: ['Graph', 'RAG'], difficulty: 'Advanced' },
-  { id: '21-agent-frameworks', order: 21, title: '工业级智能体框架演进 (LangGraph / AutoGen)', slug: 'agent-frameworks', description: '多智能体对话、角色分工与群聊编排模式', tags: ['Multi-Agent', 'AutoGen'], difficulty: 'Advanced' },
-  { id: '22-multi-agent-scale', order: 22, title: '大规模多智能体编排与分布式调度', slug: 'multi-agent-scale', description: '层次化拓扑、冲突裁决与任务容错编排', tags: ['Scale', 'Multi-Agent'], difficulty: 'Advanced' },
-  { id: '23-ai-security', order: 23, title: 'AI 安全风控与提示词注入防御', slug: 'ai-security', description: '红蓝对抗、越狱防御、敏感信息脱敏与护栏策略', tags: ['Security', 'Safety'], difficulty: 'Advanced' },
-  { id: '24-edge-ai', order: 24, title: '端侧 AI 与边缘设备本地推理加速 (Apple MLX)', slug: 'edge-ai', description: 'Apple MLX、统一内存优化与端侧极速推理落地', tags: ['Edge', 'Mobile'], difficulty: 'Advanced' }
+  // 🟢 初级阶段 (Beginner, 1 - 6)
+  { id: '01-prompt-engineering', order: 1, title: '提示词工程核心技术与框架', slug: 'prompt-engineering', description: '系统提示词、思维链 CoT、少样本 Few-Shot 与工业级提示词工程化', tags: ['Prompt', 'NLP'], difficulty: 'Beginner' },
+  { id: '02-function-calling', order: 2, title: '函数调用基础与数据验证', slug: 'function-calling', description: 'JSON Schema 结构化声明、Pydantic 参数校验与工具安全路由分发', tags: ['Tool', 'API'], difficulty: 'Beginner' },
+  { id: '03-mcp', order: 3, title: '学习 MCP 协议核心概念与服务端开发', slug: 'mcp', description: 'Anthropic Model Context Protocol 协议、跨进程标准资源暴露与服务端实现', tags: ['MCP', 'Protocol'], difficulty: 'Beginner' },
+  { id: '05-embedding', order: 4, title: '文本向量化、空间几何与语义相似度算法', slug: 'embedding', description: '稠密与稀疏向量表征、余弦相似度几何计算与高维语义投影', tags: ['NLP', 'Vector'], difficulty: 'Beginner' },
+  { id: '04-rag', order: 5, title: 'RAG 检索增强生成 · 深度学习与实战', slug: 'rag', description: '文档切片清洗、向量数据库 Chroma/FAISS 存储与 Top-K 上下文组装问答', tags: ['RAG', 'VectorDB'], difficulty: 'Beginner' },
+  { id: '11-python-advanced', order: 6, title: 'Python 高级特性与高性能编程', slug: 'python-advanced', description: '异步 asyncio 协程并发、dataclass 数据类、生成器与企业级类型注解', tags: ['Python', 'Async'], difficulty: 'Beginner' },
+
+  // 🟡 中级阶段 (Intermediate, 7 - 17)
+  { id: '12-fastapi-advanced', order: 7, title: '大模型高性能 API 网关与 SSE 流式输出', slug: 'fastapi-advanced', description: '依赖注入、Server-Sent Events 打字机流式长连接与异步高并发网关', tags: ['Backend', 'FastAPI'], difficulty: 'Intermediate' },
+  { id: '13-sqlalchemy-advanced', order: 8, title: '智能体状态持久化与用户记忆资产', slug: 'sqlalchemy-advanced', description: '异步 SQLAlchemy 状态流转、用户会话画像与认知资产持久化存储', tags: ['Database', 'ORM'], difficulty: 'Intermediate' },
+  { id: '14-celery-advanced', order: 9, title: '大模型长耗时任务解耦与多 Agent 分布式编排', slug: 'celery-advanced', description: 'Redis 消息队列、后台削峰填谷、异步长任务解耦与分布式作业编排', tags: ['Queue', 'Distributed'], difficulty: 'Intermediate' },
+  { id: '06-agent-basics', order: 10, title: 'LangGraph 智能体基础与循环决策', slug: 'agent-basics', description: '基于 StateGraph 的有状态图编排、条件边路由、工具节点与自主决策循环', tags: ['Agent', 'LangGraph'], difficulty: 'Intermediate' },
+  { id: '07-advanced-memory', order: 11, title: '智能体深度记忆与长效认知架构', slug: 'advanced-memory', description: '短期滑动窗口、会话摘要压缩、长效用户画像与跨会话实体认知记忆', tags: ['Memory', 'Agent'], difficulty: 'Intermediate' },
+  { id: '26-hybrid-search-rerank', order: 12, title: '工业级混合检索与重排工程 (Hybrid Search & Reranking)', slug: 'hybrid-search-rerank', description: 'Dense 语义向量 + Sparse BM25 词法混合召回、RRF 倒排融合与 Cross-Encoder 深度重排', tags: ['RAG', 'Rerank'], difficulty: 'Intermediate' },
+  { id: '08-multimodal', order: 13, title: '多模态与视觉识别探索', slug: 'multimodal', description: '视觉大模型、多模态图表识别、文档复杂版面 OCR 与跨模态对齐推理', tags: ['Vision', 'Audio'], difficulty: 'Intermediate' },
+  { id: '21-agent-frameworks', order: 14, title: '工业级智能体框架演进 (LangGraph / AutoGen / CrewAI)', slug: 'agent-frameworks', description: '主流生产级智能体框架深度横向测评、选型对比与角色分工群聊协作', tags: ['Multi-Agent', 'AutoGen'], difficulty: 'Intermediate' },
+  { id: '09-evaluation', order: 15, title: 'RAGAS 自动化评估与全链路评测', slug: 'evaluation', description: '忠实度、答案相关度、上下文召回率量化评估与 LangSmith 全链路 Trace 追踪', tags: ['Eval', 'Tracing'], difficulty: 'Intermediate' },
+  { id: '10-production', order: 16, title: '端到端生产级智能体与人机协同', slug: 'production', description: '生产环境熔断降级、语义缓存优化与 Human-in-the-loop 人机回环协同审批', tags: ['Prod', 'HITL'], difficulty: 'Intermediate' },
+  { id: '15-agent-architecture', order: 17, title: '企业级全栈 Agent 架构协同实战', slug: 'agent-architecture', description: 'Plan-and-Solve、ReAct 范式演进、前后端打通与多租户权限隔离实战', tags: ['Agent', 'Architecture'], difficulty: 'Intermediate' },
+
+  // 🔴 高级阶段 (Advanced, 18 - 26)
+  { id: '16-face-recognition', order: 18, title: '生产级人脸识别架构', slug: 'face-recognition', description: '计算机视觉深度特征提取、特征向量比对与高可靠人脸核身工程', tags: ['CV', 'Vision'], difficulty: 'Advanced' },
+  { id: '17-transformers-basics', order: 19, title: 'Transformer 架构底座与硬件算子开发', slug: 'transformers-basics', description: '纯 PyTorch 手写 Self-Attention、Multi-Head Attention、RoPE 与 KV Cache 算子', tags: ['Transformer', 'Math'], difficulty: 'Advanced' },
+  { id: '18-inference-serving', order: 20, title: '大模型高性能推理服务与高并发压测 (vLLM / Triton)', slug: 'inference-serving', description: 'PagedAttention 显存优化、连续批处理 Continuous Batching 与生产级并发吞吐压测', tags: ['Serving', 'vLLM'], difficulty: 'Advanced' },
+  { id: '19-model-finetuning', order: 21, title: '领域大模型微调与 LoRA 适配 (PEFT / QLoRA)', slug: 'model-finetuning', description: 'PEFT 参数高效微调、QLoRA 4-bit 量化加载与垂直领域微调语料清洗飞轮', tags: ['Finetune', 'LoRA'], difficulty: 'Advanced' },
+  { id: '25-reasoning-rl', order: 22, title: '大模型后训练强化学习与长思维链推理 (GRPO & Reasoning RL)', slug: 'reasoning-rl', description: 'DeepSeek-R1 核心的 GRPO 组相对优势算法、规则驱动多维奖励引擎与自反思推理', tags: ['RL', 'DeepSeek'], difficulty: 'Advanced' },
+  { id: '20-graph-rag', order: 23, title: '知识图谱增强检索与拓扑推理 (Graph RAG)', slug: 'graph-rag', description: '图谱实体三元组抽取、拓扑关联子图检索与多跳逻辑推理增强', tags: ['Graph', 'RAG'], difficulty: 'Advanced' },
+  { id: '22-multi-agent-scale', order: 24, title: '多智能体集群编排与规模化调度', slug: 'multi-agent-scale', description: '多 Agent 集群组织拓扑、动态辩论裁决与生产级分布式任务容错调度', tags: ['Scale', 'Multi-Agent'], difficulty: 'Advanced' },
+  { id: '23-ai-security', order: 25, title: 'AI 安全防御、防提示词注入与沙箱隔离', slug: 'ai-security', description: '间接提示词注入攻击防御、AST 静态审查、沙箱逃逸防护与安全护栏 Guardrails', tags: ['Security', 'Safety'], difficulty: 'Advanced' },
+  { id: '24-edge-ai', order: 26, title: '端侧 AI 与边缘设备本地推理加速 (Apple MLX)', slug: 'edge-ai', description: 'Apple MLX 框架、统一内存架构 (UMA) 深度优化与端侧轻量化模型毫秒级推理', tags: ['Edge', 'Mobile'], difficulty: 'Advanced' }
 ];
 
 export default function App() {

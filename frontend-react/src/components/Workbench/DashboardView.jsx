@@ -19,7 +19,7 @@ const DOMAIN_CONFIG = [
     name: 'RAG & 向量检索架构',
     icon: Database,
     description: 'Chroma/混合检索、动态分块、重排与 Graph RAG 融合',
-    phaseIds: ['04-rag', '20-graph-rag', '08-multimodal']
+    phaseIds: ['04-rag', '26-hybrid-search-rerank', '20-graph-rag', '08-multimodal']
   },
   {
     id: 'agent_graph',
@@ -32,8 +32,8 @@ const DOMAIN_CONFIG = [
     id: 'llmops_serving',
     name: 'LLMOps 推理与微调',
     icon: Target,
-    description: 'Transformers 注意力机制、vLLM 推理加速、LoRA 微调与端侧部署',
-    phaseIds: ['17-transformers-basics', '18-inference-serving', '19-model-finetuning', '24-edge-ai']
+    description: 'Transformers 注意力机制、vLLM 推理加速、LoRA 微调、强化学习与端侧部署',
+    phaseIds: ['17-transformers-basics', '18-inference-serving', '19-model-finetuning', '25-reasoning-rl', '24-edge-ai']
   },
   {
     id: 'ai_security',

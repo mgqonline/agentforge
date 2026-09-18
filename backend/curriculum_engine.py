@@ -1259,34 +1259,78 @@ if __name__ == '__main__':
     }
 }
 
-# 企业级 AI 全栈实战关卡知识图谱与前置依赖树
+# =====================================================================
+# 企业级 AI 课程体系：初、中、高级由浅入深逻辑排序与前置拓扑映射
+# =====================================================================
+
+# 1. 逻辑关卡顺序 (Order 1 ~ 26) 严格遵循：初级 (1-6) -> 中级 (7-17) -> 高级 (18-26)
+CURRICULUM_ORDER_MAP = {
+    # 🟢 初级阶段 (Beginner): 基础基石与交互协议 (1-6)
+    "01-prompt-engineering": 1,
+    "02-function-calling": 2,
+    "03-mcp": 3,
+    "05-embedding": 4,
+    "04-rag": 5,
+    "11-python-advanced": 6,
+
+    # 🟡 中级阶段 (Intermediate): 企业全栈工程化与智能体进阶 (7-17)
+    "12-fastapi-advanced": 7,
+    "13-sqlalchemy-advanced": 8,
+    "14-celery-advanced": 9,
+    "06-agent-basics": 10,
+    "07-advanced-memory": 11,
+    "26-hybrid-search-rerank": 12,
+    "08-multimodal": 13,
+    "21-agent-frameworks": 14,
+    "09-evaluation": 15,
+    "10-production": 16,
+    "15-agent-architecture": 17,
+
+    # 🔴 高级阶段 (Advanced): 底座内核、集群规模化与算力前沿 (18-26)
+    "16-face-recognition": 18,
+    "17-transformers-basics": 19,
+    "18-inference-serving": 20,
+    "19-model-finetuning": 21,
+    "25-reasoning-rl": 22,
+    "20-graph-rag": 23,
+    "22-multi-agent-scale": 24,
+    "23-ai-security": 25,
+    "24-edge-ai": 26,
+}
+
+# 2. 精准的前置拓扑依赖树 (严格指向当前关卡之前的逻辑关卡，无循环、无前向跳跃)
 PREREQUISITES_MAP = {
+    # 🟢 初级
     "01-prompt-engineering": [],
     "02-function-calling": ["01-prompt-engineering"],
     "03-mcp": ["02-function-calling"],
-    "04-rag": ["01-prompt-engineering"],
-    "05-embedding": ["04-rag"],
-    "06-agent-basics": ["02-function-calling"],
-    "07-advanced-memory": ["06-agent-basics"],
-    "08-multimodal": ["01-prompt-engineering"],
-    "09-evaluation": ["04-rag"],
-    "10-production": ["06-agent-basics"],
+    "05-embedding": ["01-prompt-engineering"],
+    "04-rag": ["05-embedding"],
     "11-python-advanced": ["01-prompt-engineering"],
+
+    # 🟡 中级
     "12-fastapi-advanced": ["11-python-advanced"],
     "13-sqlalchemy-advanced": ["12-fastapi-advanced"],
     "14-celery-advanced": ["12-fastapi-advanced"],
-    "15-agent-architecture": ["06-agent-basics"],
+    "06-agent-basics": ["02-function-calling", "11-python-advanced"],
+    "07-advanced-memory": ["06-agent-basics", "13-sqlalchemy-advanced"],
+    "26-hybrid-search-rerank": ["04-rag", "05-embedding"],
+    "08-multimodal": ["06-agent-basics"],
+    "21-agent-frameworks": ["06-agent-basics"],
+    "09-evaluation": ["04-rag", "06-agent-basics"],
+    "10-production": ["06-agent-basics", "12-fastapi-advanced"],
+    "15-agent-architecture": ["10-production", "14-celery-advanced"],
+
+    # 🔴 高级
     "16-face-recognition": ["08-multimodal"],
-    "17-transformers-basics": ["05-embedding"],
+    "17-transformers-basics": ["05-embedding", "11-python-advanced"],
     "18-inference-serving": ["17-transformers-basics"],
     "19-model-finetuning": ["17-transformers-basics"],
-    "20-graph-rag": ["04-rag"],
-    "21-agent-frameworks": ["15-agent-architecture"],
-    "22-multi-agent-scale": ["21-agent-frameworks"],
-    "23-ai-security": ["03-mcp"],
-    "24-edge-ai": ["18-inference-serving"],
-    "25-reasoning-rl": ["17-transformers-basics", "19-model-finetuning"],
-    "26-hybrid-search-rerank": ["04-rag", "05-embedding"],
+    "25-reasoning-rl": ["19-model-finetuning"],
+    "20-graph-rag": ["04-rag", "26-hybrid-search-rerank"],
+    "22-multi-agent-scale": ["21-agent-frameworks", "15-agent-architecture"],
+    "23-ai-security": ["03-mcp", "10-production"],
+    "24-edge-ai": ["18-inference-serving", "19-model-finetuning"],
 }
 
 class CurriculumEngine:
@@ -1314,7 +1358,7 @@ class CurriculumEngine:
         return "实战核心实现脚本"
 
     def get_all_phases(self) -> List[Dict[str, Any]]:
-        """扫描根目录下所有数字开头的阶段目录，提取元数据并排序"""
+        """扫描根目录下所有数字开头的阶段目录，提取元数据并按初中高由浅入深逻辑顺序排序"""
         phases = []
         if not os.path.exists(self.base_dir):
             return phases
@@ -1329,8 +1373,11 @@ class CurriculumEngine:
             
             match = phase_pattern.match(entry)
             if match:
-                order_num = int(match.group(1))
+                raw_num = int(match.group(1))
                 slug = match.group(2)
+                
+                # 采用全新的逻辑进阶序号 (初级 1-6 -> 中级 7-17 -> 高级 18-26)
+                order_num = CURRICULUM_ORDER_MAP.get(entry, raw_num)
                 
                 # 初始默认标题：剥离前缀数字，如 "function-calling" -> "Function Calling"
                 title = self.clean_phase_title(slug.replace("-", " ").title())
@@ -1378,20 +1425,10 @@ class CurriculumEngine:
                 else:
                     tags.extend(["AI-Core", "Practical"])
 
-                # 精细化初、中、高级三级进阶分层体系
-                beginner_phases = {
-                    "01-prompt-engineering", "02-function-calling", "03-mcp",
-                    "04-rag", "05-embedding", "11-python-advanced"
-                }
-                intermediate_phases = {
-                    "06-agent-basics", "07-advanced-memory", "08-multimodal",
-                    "09-evaluation", "10-production", "12-fastapi-advanced",
-                    "13-sqlalchemy-advanced", "14-celery-advanced", "15-agent-architecture",
-                    "21-agent-frameworks", "26-hybrid-search-rerank"
-                }
-                if entry in beginner_phases:
+                # 精细化初、中、高级三级进阶分层
+                if order_num <= 6:
                     diff_level = "Beginner"
-                elif entry in intermediate_phases:
+                elif order_num <= 17:
                     diff_level = "Intermediate"
                 else:
                     diff_level = "Advanced"
@@ -1408,7 +1445,7 @@ class CurriculumEngine:
                     "is_locked": False,
                 })
 
-        # 按序号排序
+        # 严格按逻辑进阶由浅入深序号 (1 到 26) 排序
         phases.sort(key=lambda x: x["order"])
         return phases
 
