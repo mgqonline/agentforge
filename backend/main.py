@@ -671,6 +671,7 @@ try:
         create_access_token,
         verify_access_token,
         authenticate_user,
+        get_user_by_id,
         list_all_tenants,
         list_tenant_users,
         create_new_user,
@@ -697,6 +698,7 @@ except ImportError:
         create_access_token,
         verify_access_token,
         authenticate_user,
+        get_user_by_id,
         list_all_tenants,
         list_tenant_users,
         create_new_user,
@@ -769,6 +771,7 @@ async def api_auth_login(req: LoginRequest):
         user_id=user.user_id,
         tenant_id=tenant_id,
         role=user.role,
+        username=user.username,
     )
     tenant_info = get_tenant_info(tenant_id)
     record_user_action(
@@ -808,14 +811,27 @@ async def api_auth_me(
     """获取当前登录用户信息与租户配额状态"""
     ctx = resolve_tenant_context(authorization, x_tenant_id)
     tenant_info = get_tenant_info(ctx.tenant_id)
-    username = getattr(ctx, "username", "admin")
-    user = USER_STORE.get(username)
+    
+    # 优先根据 Token 中的 username 获取用户；若缺失则依据 user_id 反查，杜绝 fallback 误判为 admin
+    user = None
+    username = getattr(ctx, "username", None)
+    if username and username in USER_STORE:
+        user = USER_STORE[username]
+    elif hasattr(ctx, "user_id"):
+        user = get_user_by_id(ctx.user_id)
+        if user:
+            username = user.username
+            
+    if not user:
+        username = username or "admin"
+        user = USER_STORE.get(username)
+
     role_val = ctx.role.value if hasattr(ctx.role, "value") else str(ctx.role)
     
     return {
         "status": "success",
         "user": {
-            "user_id": getattr(ctx, "user_id", "usr_superadmin_01"),
+            "user_id": getattr(ctx, "user_id", user.user_id if user else "usr_superadmin_01"),
             "username": username,
             "display_name": user.display_name if user else f"用户 {username}",
             "role": role_val,
@@ -849,10 +865,17 @@ async def api_switch_tenant(
     if not target_tenant:
         raise HTTPException(status_code=404, detail=f"目标租户 [{req.target_tenant_id}] 不存在")
     
+    username = getattr(ctx, "username", None)
+    if not username and hasattr(ctx, "user_id"):
+        u = get_user_by_id(ctx.user_id)
+        if u:
+            username = u.username
+
     new_token = create_access_token(
         user_id=getattr(ctx, "user_id", "usr_superadmin_01"),
         tenant_id=req.target_tenant_id,
         role=ctx.role,
+        username=username,
     )
     return {
         "status": "success",

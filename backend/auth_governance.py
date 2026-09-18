@@ -377,6 +377,7 @@ class TokenPayload(BaseModel):
     user_id: str
     tenant_id: str
     role: UserRole
+    username: Optional[str] = None
     exp: int
     iat: int
 
@@ -401,6 +402,7 @@ def create_access_token(
     user_id: str,
     tenant_id: str,
     role: UserRole,
+    username: Optional[str] = None,
     expires_delta: Optional[timedelta] = None,
     secret_key: str = DEFAULT_JWT_SECRET,
 ) -> str:
@@ -415,6 +417,7 @@ def create_access_token(
     header = {"alg": DEFAULT_JWT_ALGORITHM, "typ": "JWT"}
     payload = {
         "user_id": user_id,
+        "username": username or "",
         "tenant_id": tenant_id,
         "role": role.value,
         "iat": now,
@@ -481,11 +484,20 @@ def verify_access_token(
 
     return TokenPayload(
         user_id=payload_data["user_id"],
+        username=payload_data.get("username") or None,
         tenant_id=payload_data["tenant_id"],
         role=UserRole(payload_data["role"]),
         exp=payload_data["exp"],
         iat=payload_data["iat"],
     )
+
+
+def get_user_by_id(user_id: str) -> Optional[UserRecord]:
+    """根据 user_id 高效检索用户记录"""
+    for u in USER_STORE.values():
+        if u.user_id == user_id:
+            return u
+    return None
 
 
 # =====================================================================

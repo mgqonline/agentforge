@@ -66,11 +66,17 @@ export default function App() {
     tokens_remaining: 1857500,
     is_exhausted: false
   });
-  const [currentUser, setCurrentUser] = useState({
-    user_id: 'usr_superadmin_01',
-    username: 'admin',
-    role: 'admin',
-    display_name: '超级管理员 (最高权限)'
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const cached = localStorage.getItem('agentforge_cached_user');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return {
+      user_id: 'usr_superadmin_01',
+      username: 'admin',
+      role: 'admin',
+      display_name: '超级管理员 (最高权限)'
+    };
   });
   const [tenantsList, setTenantsList] = useState([]);
   const [isGovernanceOpen, setIsGovernanceOpen] = useState(false);
@@ -88,6 +94,7 @@ export default function App() {
   const handleLogout = () => {
     try {
       localStorage.removeItem('agentforge_jwt_token');
+      localStorage.removeItem('agentforge_cached_user');
     } catch (e) {
       console.warn('Clear token error:', e);
     }
@@ -95,7 +102,12 @@ export default function App() {
   };
 
   const handleLoginSuccess = (authData) => {
-    if (authData?.user) setCurrentUser(authData.user);
+    if (authData?.user) {
+      setCurrentUser(authData.user);
+      try {
+        localStorage.setItem('agentforge_cached_user', JSON.stringify(authData.user));
+      } catch {}
+    }
     if (authData?.tenant) setCurrentTenant(authData.tenant);
     setIsAuthenticated(true);
     fetchTenantContext();
@@ -202,16 +214,23 @@ export default function App() {
       const meRes = await fetch('/api/v1/auth/me', { headers });
       if (!meRes.ok) {
         localStorage.removeItem('agentforge_jwt_token');
+        localStorage.removeItem('agentforge_cached_user');
         setIsAuthenticated(false);
         return;
       }
       const meData = await meRes.json();
       if (meData.status === 'success') {
-        if (meData.user) setCurrentUser(meData.user);
+        if (meData.user) {
+          setCurrentUser(meData.user);
+          try {
+            localStorage.setItem('agentforge_cached_user', JSON.stringify(meData.user));
+          } catch {}
+        }
         if (meData.tenant) setCurrentTenant(meData.tenant);
         setIsAuthenticated(true);
       } else {
         localStorage.removeItem('agentforge_jwt_token');
+        localStorage.removeItem('agentforge_cached_user');
         setIsAuthenticated(false);
       }
 
