@@ -7,7 +7,7 @@ import {
   Maximize2, Minimize2, GripHorizontal, Award, RefreshCw, Send,
   ShieldCheck, AlertTriangle, Lightbulb, Save, Undo2, AlertCircle, X,
   GitCompare, ArrowRight, BookOpen, Lock, Unlock, Building2, Zap, Image, Eye,
-  Search, FileCode, Check, Code2
+  Search, FileCode, Check, Code2, Trash2, Filter
 } from 'lucide-react';
 import { PYTHON_METHODS_CATALOG, getPythonCompletionItems, getPythonHoverInfo } from './pythonCompletionData';
 
@@ -102,6 +102,15 @@ export default function CodeConsole({
   const completionDisposableRef = useRef(null);
   const hoverDisposableRef = useRef(null);
 
+  // 控制台输出过滤与检索体系
+  const [consoleFilter, setConsoleFilter] = useState('all'); // 'all' | 'stdout' | 'stderr'
+  const [consoleSearchQuery, setConsoleSearchQuery] = useState('');
+
+  // 划词定向提问与多轮对话体系
+  const [selectedCode, setSelectedCode] = useState('');
+  const [selectionWidgetPos, setSelectionWidgetPos] = useState(null); // { top, left }
+  const [mentorChatHistory, setMentorChatHistory] = useState([]); // [{ role: 'user'|'assistant', content: '...' }]
+
   // 引用最新函数指针，供 Monaco 编辑器快捷键无缝调用
   const handleRunCodeRef = useRef(null);
   const handleSaveImmediatelyRef = useRef(null);
@@ -158,6 +167,33 @@ export default function CodeConsole({
           const word = model.getWordAtPosition(position);
           if (!word) return null;
           return getPythonHoverInfo(monaco, word.word, lineContent);
+        }
+      });
+
+      // 3. 监听编辑器划词选区，呼出定向提问悬浮药丸
+      editor.onDidChangeCursorSelection((e) => {
+        const selection = e.selection;
+        if (!selection || selection.isEmpty()) {
+          setSelectionWidgetPos(null);
+          setSelectedCode('');
+          return;
+        }
+        const model = editor.getModel();
+        if (!model) return;
+        const text = model.getValueInRange(selection);
+        if (text && text.trim().length > 0) {
+          const endPos = selection.getEndPosition();
+          const scrolledPos = editor.getScrolledVisiblePosition(endPos);
+          if (scrolledPos) {
+            setSelectedCode(text);
+            setSelectionWidgetPos({
+              top: Math.max(10, scrolledPos.top - 32),
+              left: Math.max(10, scrolledPos.left + 15)
+            });
+          }
+        } else {
+          setSelectionWidgetPos(null);
+          setSelectedCode('');
         }
       });
     } catch (e) {
@@ -756,17 +792,28 @@ export default function CodeConsole({
     });
 
     try {
+      const activeSelectedCode = selectedCode; // 保存当前选中的局部代码
+      const payload = {
+        phase_id: phaseId,
+        user_code: code,
+        selected_code: activeSelectedCode || undefined,
+        chat_history: mentorChatHistory.length > 0 ? mentorChatHistory : undefined,
+        error_output: errText,
+        question: q,
+        image_data: mentorImage
+      };
+
+      // 将本次提问推入历史记录
+      setMentorChatHistory(prev => [
+        ...prev,
+        { role: 'user', content: activeSelectedCode ? `[关注代码]:\n\`\`\`python\n${activeSelectedCode}\n\`\`\`\n\n${q}` : q }
+      ]);
+
       const resp = await fetch('/api/v1/mentor/review/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: abortController.signal,
-        body: JSON.stringify({
-          phase_id: phaseId,
-          user_code: code,
-          error_output: errText,
-          question: q,
-          image_data: mentorImage
-        })
+        body: JSON.stringify(payload)
       });
 
       if (!resp.ok) {
@@ -820,7 +867,19 @@ export default function CodeConsole({
           }
         }
       }
+
+      // 将导师回复作为 assistant 角色加入上下文历史
+      if (accumulatedReview.trim()) {
+        setMentorChatHistory(prev => [
+          ...prev,
+          { role: 'assistant', content: accumulatedReview }
+        ]);
+      }
+
       if (overrideQ) setMentorQuestion('');
+      // 提问完成后清空局部划词选区与浮层
+      setSelectedCode('');
+      setSelectionWidgetPos(null);
     } catch (err) {
       if (err.name !== 'AbortError') {
         setMentorReview({
@@ -2245,6 +2304,67 @@ export default function CodeConsole({
                 }}
               />
             )}
+
+            {/* 编辑器划词定向提问悬浮气泡 Widget */}
+            {selectionWidgetPos && selectedCode && !isDiffMode && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: `${selectionWidgetPos.top}px`,
+                  left: `${selectionWidgetPos.left}px`,
+                  zIndex: 100,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'var(--wb-bg-panel, #1e2230)',
+                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                  borderRadius: '6px',
+                  padding: '3px 6px',
+                  animation: 'fadeIn 0.15s ease'
+                }}
+              >
+                <button
+                  onClick={() => {
+                    handleAskMentor(`请重点针对我选中的这段代码片段进行深入剖析：它是如何运转的？是否存在隐藏边界缺陷或性能隐患？`);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    background: 'rgba(59, 130, 246, 0.2)',
+                    border: 'none',
+                    borderRadius: '4px',
+                    padding: '2px 8px',
+                    color: '#60a5fa',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                  title="向 AI 导师提问选中的这几行代码"
+                >
+                  <Sparkles size={11} color="#60a5fa" />
+                  <span>💡 提问选中代码</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectionWidgetPos(null);
+                    setSelectedCode('');
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--wb-text-dim)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '2px'
+                  }}
+                >
+                  <X size={11} />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -2393,10 +2513,132 @@ export default function CodeConsole({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* 控制台专属工具栏 (仅在控制台输出 Tab 展开时显示) */}
+            {activeTab === 'terminal' && !isTerminalCollapsed && runResult && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {/* 搜索过滤输入框 */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: 'var(--wb-bg-subtle, rgba(255,255,255,0.04))',
+                  border: '1px solid var(--wb-border-subtle, rgba(255,255,255,0.1))',
+                  borderRadius: '4px',
+                  padding: '1px 6px',
+                  gap: '4px'
+                }}>
+                  <Search size={10} color="var(--wb-text-dim)" />
+                  <input
+                    type="text"
+                    value={consoleSearchQuery}
+                    onChange={(e) => setConsoleSearchQuery(e.target.value)}
+                    placeholder="过滤日志..."
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      outline: 'none',
+                      fontSize: '10.5px',
+                      color: 'var(--wb-text-bright)',
+                      width: '75px'
+                    }}
+                  />
+                  {consoleSearchQuery && (
+                    <button
+                      onClick={() => setConsoleSearchQuery('')}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--wb-text-dim)', cursor: 'pointer', padding: 0 }}
+                    >
+                      <X size={10} />
+                    </button>
+                  )}
+                </div>
+
+                {/* 分级过滤分段器 */}
+                <div style={{
+                  display: 'flex',
+                  background: 'var(--wb-bg-subtle, rgba(255,255,255,0.04))',
+                  padding: '1px',
+                  borderRadius: '4px',
+                  border: '1px solid var(--wb-border-subtle, rgba(255,255,255,0.08))'
+                }}>
+                  <button
+                    onClick={() => setConsoleFilter('all')}
+                    style={{
+                      padding: '1px 6px',
+                      fontSize: '10px',
+                      border: 'none',
+                      borderRadius: '3px',
+                      cursor: 'pointer',
+                      background: consoleFilter === 'all' ? 'var(--wb-bg-hover, rgba(255,255,255,0.12))' : 'transparent',
+                      color: consoleFilter === 'all' ? '#fff' : 'var(--wb-text-dim)'
+                    }}
+                    title="显示全部标准输出与错误日志"
+                  >
+                    全部
+                  </button>
+                  <button
+                    onClick={() => setConsoleFilter('stdout')}
+                    style={{
+                      padding: '1px 6px',
+                      fontSize: '10px',
+                      border: 'none',
+                      borderRadius: '3px',
+                      cursor: 'pointer',
+                      background: consoleFilter === 'stdout' ? 'var(--wb-bg-hover, rgba(255,255,255,0.12))' : 'transparent',
+                      color: consoleFilter === 'stdout' ? '#60a5fa' : 'var(--wb-text-dim)'
+                    }}
+                    title="仅显示 stdout 打印日志"
+                  >
+                    stdout
+                  </button>
+                  <button
+                    onClick={() => setConsoleFilter('stderr')}
+                    style={{
+                      padding: '1px 6px',
+                      fontSize: '10px',
+                      border: 'none',
+                      borderRadius: '3px',
+                      cursor: 'pointer',
+                      background: consoleFilter === 'stderr' ? 'rgba(239, 68, 68, 0.2)' : 'transparent',
+                      color: consoleFilter === 'stderr' ? '#f87171' : 'var(--wb-text-dim)'
+                    }}
+                    title="仅显示 stderr 错误堆栈"
+                  >
+                    stderr
+                  </button>
+                </div>
+
+                {/* 清屏按钮 */}
+                <button
+                  onClick={() => {
+                    setRunResult(null);
+                    setConsoleSearchQuery('');
+                  }}
+                  className="wb-btn-ghost"
+                  style={{ padding: '2px 5px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px' }}
+                  title="清空当前控制台输出"
+                >
+                  <Trash2 size={10} />
+                  <span>清屏</span>
+                </button>
+              </div>
+            )}
+
             {runResult && !isTerminalCollapsed && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--wb-text-dim)' }}>
-                <span>{runResult.execution_time_ms}ms</span>
-                <span style={{ color: runResult.status === 'success' ? '#22c55e' : '#f43f5e' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10.5px', color: 'var(--wb-text-dim)' }}>
+                <span style={{
+                  padding: '1px 5px',
+                  borderRadius: '3px',
+                  background: 'rgba(255,255,255,0.05)',
+                  fontFamily: 'monospace'
+                }}>
+                  {runResult.execution_time_ms}ms
+                </span>
+                <span style={{
+                  padding: '1px 5px',
+                  borderRadius: '3px',
+                  fontWeight: 600,
+                  background: runResult.status === 'success' && runResult.exit_code === 0 ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                  color: runResult.status === 'success' && runResult.exit_code === 0 ? '#4ade80' : '#f87171'
+                }}>
                   Exit {runResult.exit_code ?? 0}
                 </span>
               </div>
@@ -2437,16 +2679,49 @@ export default function CodeConsole({
                   </div>
                 ) : (
                   <div>
-                    {runResult.stdout && (
-                      <pre style={{ margin: 0, color: 'var(--wb-text-bright)', whiteSpace: 'pre-wrap', fontSize: '12px' }}>
-                        {runResult.stdout}
-                      </pre>
-                    )}
-                    {runResult.stderr && (
-                      <pre style={{ margin: '6px 0 0', color: '#fb7185', whiteSpace: 'pre-wrap', fontSize: '12px' }}>
-                        {runResult.stderr}
-                      </pre>
-                    )}
+                    {(() => {
+                      // 根据搜索词和分级过滤动态筛选日志行
+                      const filterText = (text) => {
+                        if (!text) return '';
+                        if (!consoleSearchQuery.trim()) return text;
+                        const q = consoleSearchQuery.toLowerCase();
+                        return text
+                          .split('\n')
+                          .filter(line => line.toLowerCase().includes(q))
+                          .join('\n');
+                      };
+
+                      const showStdout = (consoleFilter === 'all' || consoleFilter === 'stdout');
+                      const showStderr = (consoleFilter === 'all' || consoleFilter === 'stderr');
+
+                      const filteredStdout = showStdout ? filterText(runResult.stdout) : '';
+                      const filteredStderr = showStderr ? filterText(runResult.stderr) : '';
+
+                      const hasAnyOutput = Boolean(filteredStdout || filteredStderr);
+
+                      if (consoleSearchQuery && !hasAnyOutput) {
+                        return (
+                          <div style={{ color: 'var(--wb-text-dim)', fontSize: '12px', padding: '16px 0', textAlign: 'center' }}>
+                            🔍 未找到匹配关键字「{consoleSearchQuery}」的日志行
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <>
+                          {filteredStdout && (
+                            <pre style={{ margin: 0, color: 'var(--wb-text-bright)', whiteSpace: 'pre-wrap', fontSize: '12px' }}>
+                              {filteredStdout}
+                            </pre>
+                          )}
+                          {filteredStderr && (
+                            <pre style={{ margin: filteredStdout ? '6px 0 0' : 0, color: '#fb7185', whiteSpace: 'pre-wrap', fontSize: '12px' }}>
+                              {filteredStderr}
+                            </pre>
+                          )}
+                        </>
+                      );
+                    })()}
 
                     {/* 多租户算力扣减与调度流水反馈 */}
                     {runResult.tenant_quota && (
@@ -2962,6 +3237,61 @@ export default function CodeConsole({
                         }}
                         style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
                       >
+                        {/* 划词重点聚焦与多轮对话指示微胶囊 */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                          {selectedCode ? (
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '3px 8px',
+                              background: 'rgba(59, 130, 246, 0.15)',
+                              border: '1px solid rgba(59, 130, 246, 0.35)',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              color: '#93c5fd'
+                            }}>
+                              <Sparkles size={11} color="#60a5fa" />
+                              <span>已锁定选区 ({selectedCode.split('\n').length} 行代码聚焦)</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCode('');
+                                  setSelectionWidgetPos(null);
+                                }}
+                                style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0 }}
+                                title="取消选区锁定"
+                              >
+                                <X size={11} />
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '10.5px', color: 'var(--wb-text-dim)' }}>
+                              💡 提示：在编辑器中划词选中局部代码可进行定向解答
+                            </span>
+                          )}
+
+                          {mentorChatHistory.length > 0 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '10.5px', color: 'var(--wb-text-dim)' }}>
+                                连贯对话: {Math.floor(mentorChatHistory.length / 2)} 轮上下文
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMentorChatHistory([]);
+                                  showToast('已清空导师多轮对话上下文');
+                                }}
+                                className="wb-btn-ghost"
+                                style={{ fontSize: '10px', padding: '1px 5px' }}
+                                title="重置对话上下文"
+                              >
+                                新对话
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
                         {mentorImage && (
                           <div style={{
                             display: 'inline-flex',

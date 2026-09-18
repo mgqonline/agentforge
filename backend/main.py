@@ -641,6 +641,8 @@ class MentorReviewRequest(BaseModel):
     user_code: str
     error_output: Optional[str] = ""
     question: Optional[str] = ""
+    selected_code: Optional[str] = None  # 用户在编辑器中选中的局部目标代码 (定向划词答疑)
+    chat_history: Optional[List[dict]] = None  # 多轮追问上下文历史 [{"role": "user"|"assistant", "content": "..."}]
     image_data: Optional[str] = None  # Base64 编码的架构截图或报错图片 (多模态感知)
 
 @app.get("/api/v1/curriculum/phases")
@@ -1414,6 +1416,14 @@ async def api_mentor_review_stream(req: MentorReviewRequest):
     api_key = os.getenv("OPENAI_API_KEY")
     base_url = os.getenv("OPENAI_BASE_URL", "https://api.deepseek.com")
 
+    selected_code_snippet = (req.selected_code or "").strip()
+    selected_code_section = f"""
+## 🎯 学员选中的重点关注代码 (划词提问聚焦)
+```python
+{selected_code_snippet}
+```
+""" if selected_code_snippet else ""
+
     if is_error_diagnostic:
         system_prompt = (
             "你是一名拥有深厚 AI 工程经验的资深伴学导师，采用【苏格拉底式启发教学（Socratic Teaching）】。\n"
@@ -1428,11 +1438,11 @@ async def api_mentor_review_stream(req: MentorReviewRequest):
 - **核心关卡目标摘要**:
 {guide_summary or "掌握本阶段核心 AI 架构设计与工程落地规范"}
 
-## 学员代码
+## 学员完整代码
 ```python
 {req.user_code}
 ```
-
+{selected_code_section}
 ## 终端报错或测试未通过信息
 ```
 {error_text}
@@ -1463,7 +1473,7 @@ async def api_mentor_review_stream(req: MentorReviewRequest):
 ```python
 {req.user_code}
 ```
-
+{selected_code_section}
 ## 执行状态
 ```{error_text if error_text else "代码执行退出码为 0，终端无异常报错。"}```
 
@@ -1496,7 +1506,15 @@ async def api_mentor_review_stream(req: MentorReviewRequest):
             try:
                 client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
                 
-                # 组装消息列表 (支持多模态图像感知)
+                # 组装消息列表 (支持多模态图像感知 + 多轮历史对话上下文)
+                messages = [{"role": "system", "content": system_prompt}]
+                
+                # 如果存在多轮历史对话，截取最近 4 轮加入 context
+                if req.chat_history and isinstance(req.chat_history, list):
+                    for msg in req.chat_history[-6:]:
+                        if isinstance(msg, dict) and msg.get("role") in ["user", "assistant"] and msg.get("content"):
+                            messages.append({"role": msg["role"], "content": str(msg["content"])[:2000]})
+
                 if req.image_data:
                     user_content = [
                         {"type": "text", "text": user_prompt_text},
@@ -1505,12 +1523,11 @@ async def api_mentor_review_stream(req: MentorReviewRequest):
                 else:
                     user_content = user_prompt_text
 
+                messages.append({"role": "user", "content": user_content})
+
                 stream = await client.chat.completions.create(
                     model=os.getenv("DEFAULT_MODEL", "deepseek-chat"),
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_content}
-                    ],
+                    messages=messages,
                     max_tokens=1800,
                     temperature=0.3,
                     stream=True
