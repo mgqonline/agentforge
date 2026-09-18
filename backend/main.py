@@ -4,7 +4,7 @@ import time
 import uuid
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel
-from fastapi import Depends, Header, HTTPException, FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import Depends, Header, HTTPException, FastAPI, WebSocket, WebSocketDisconnect, Response, Query
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -13,6 +13,8 @@ from dotenv import load_dotenv
 import openai
 
 from rag_engine import rag_engine
+from model_router import model_failover_router
+from knowledge_api import router as knowledge_router
 
 import sys
 import contextlib
@@ -66,6 +68,10 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# 挂载知识库管理 API 路由
+app.include_router(knowledge_router)
+
 
 # ==========================================
 # 2. 敏感词过滤 API (模拟企业安全风控网关)
@@ -676,6 +682,8 @@ try:
         list_user_audit_logs,
         save_user_progress,
         get_user_progress_map,
+        get_billing_summary,
+        generate_billing_csv_content,
     )
 except ImportError:
     from auth_governance import (
@@ -699,6 +707,8 @@ except ImportError:
         list_user_audit_logs,
         save_user_progress,
         get_user_progress_map,
+        get_billing_summary,
+        generate_billing_csv_content,
     )
 
 def resolve_tenant_context(
@@ -952,6 +962,33 @@ async def api_governance_audits(
     role_val = ctx.role.value if hasattr(ctx.role, "value") else str(ctx.role)
     tenant_filter = None if role_val == "admin" else ctx.tenant_id
     return {"status": "success", "audits": list_user_audit_logs(tenant_id=tenant_filter, limit=limit)}
+
+@app.get("/api/v1/governance/billing/summary")
+async def api_governance_billing_summary():
+    """FinOps 部门用量与财务账单汇总统计"""
+    return {"status": "success", "billing": get_billing_summary()}
+
+@app.get("/api/v1/governance/billing/export")
+async def api_governance_billing_export(
+    tenant_id: Optional[str] = Query(None)
+):
+    """导出标准 UTF-8 BOM 财务对账单 CSV 文件"""
+    csv_content = generate_billing_csv_content(tenant_id)
+    timestamp_str = time.strftime('%Y%m%d_%H%M%S')
+    filename = f"agentforge_billing_{tenant_id or 'all'}_{timestamp_str}.csv"
+    return Response(
+        content=csv_content.encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
+
+@app.get("/api/v1/models/status")
+async def api_models_status():
+    """获取多模型主备高可用集群与熔断器健康指标"""
+    return {"status": "success", "cluster": model_failover_router.get_cluster_status()}
+
 
 @app.post("/api/v1/sandbox/run")
 async def api_sandbox_run(

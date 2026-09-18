@@ -9,6 +9,7 @@ import CompetencyReportModal from './components/Workbench/CompetencyReportModal'
 import UserRoleGovernanceModal from './components/Workbench/UserRoleGovernanceModal';
 import LoginModal from './components/Workbench/LoginModal';
 import EnterpriseLoginPage from './components/Workbench/EnterpriseLoginPage';
+import KnowledgeManagerModal from './components/Workbench/KnowledgeManagerModal';
 import './index.css';
 
 // 24 阶段离线备用数据 (开箱即用保障)
@@ -105,6 +106,7 @@ export default function App() {
   const [guideCollapsed, setGuideCollapsed] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isKnowledgeOpen, setIsKnowledgeOpen] = useState(false);
 
   // 多人群主题切换 (曜石黑、北欧灰蓝、墨玉绿、纸墨白)
   const [currentTheme, setCurrentTheme] = useState('obsidian');
@@ -412,6 +414,7 @@ export default function App() {
         tenantsList={tenantsList}
         onSwitchTenant={handleSwitchTenant}
         onOpenGovernance={() => setIsGovernanceOpen(true)}
+        onOpenKnowledge={() => setIsKnowledgeOpen(true)}
         onOpenLogin={() => setIsLoginOpen(true)}
         onLogout={handleLogout}
         onSelectTheme={applyTheme}
@@ -518,6 +521,12 @@ export default function App() {
         currentUser={currentUser}
         onUpdateTenantQuota={handleUpdateTenantQuota}
         onSwitchTenant={handleSwitchTenant}
+      />
+
+      {/* 企业私有知识库中心弹窗 */}
+      <KnowledgeManagerModal
+        isOpen={isKnowledgeOpen}
+        onClose={() => setIsKnowledgeOpen(false)}
       />
 
       {/* 身份切换与登录弹窗 */}

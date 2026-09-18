@@ -3,7 +3,7 @@ import {
   CheckCircle2, Search, LayoutGrid, Code2, 
   PanelLeft, PanelRight, Maximize2, Trophy,
   Building2, ShieldCheck, Zap, User, ChevronDown,
-  LogOut, Palette, Check
+  LogOut, Palette, Check, Database, Cpu, Network
 } from 'lucide-react';
 import ThemeSwitcher from './ThemeSwitcher';
 
@@ -20,6 +20,7 @@ export default function HeaderBar({
   tenantsList = [],
   onSwitchTenant = () => {},
   onOpenGovernance = () => {},
+  onOpenKnowledge = () => {},
   onOpenLogin = () => {},
   onLogout = () => {},
   onSelectTheme = () => {},
@@ -34,6 +35,26 @@ export default function HeaderBar({
   const userMenuRef = useRef(null);
   const [isTenantMenuOpen, setIsTenantMenuOpen] = useState(false);
   const tenantMenuRef = useRef(null);
+  const [modelCluster, setModelCluster] = useState(null);
+  const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
+  const modelMenuRef = useRef(null);
+
+  useEffect(() => {
+    const fetchModelStatus = async () => {
+      try {
+        const res = await fetch('/api/v1/models/status');
+        const data = await res.json();
+        if (data.status === 'success') {
+          setModelCluster(data.cluster);
+        }
+      } catch (e) {
+        // 静默降级
+      }
+    };
+    fetchModelStatus();
+    const timer = setInterval(fetchModelStatus, 12000);
+    return () => clearInterval(timer);
+  }, []);
 
   // 点击外部自动收起下拉菜单
   useEffect(() => {
@@ -43,6 +64,9 @@ export default function HeaderBar({
       }
       if (tenantMenuRef.current && !tenantMenuRef.current.contains(event.target)) {
         setIsTenantMenuOpen(false);
+      }
+      if (modelMenuRef.current && !modelMenuRef.current.contains(event.target)) {
+        setIsModelMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -438,6 +462,148 @@ export default function HeaderBar({
               <span>概览</span>
             </button>
           </div>
+
+          {/* 知识库入口 */}
+          <button
+            onClick={onOpenKnowledge}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '3px 9px',
+              borderRadius: '5px',
+              border: '1px solid rgba(59, 130, 246, 0.25)',
+              background: 'rgba(59, 130, 246, 0.08)',
+              color: '#60a5fa',
+              fontSize: '11.5px',
+              fontWeight: 500,
+              cursor: 'pointer'
+            }}
+            title="打开企业私有知识库 (RAG & 文档解析)"
+          >
+            <Database size={12} />
+            <span>知识库</span>
+          </button>
+
+          {/* 高可用模型集群状态指示微胶囊 (Circuit Breaker Indicator) */}
+          {modelCluster && (
+            <div ref={modelMenuRef} style={{ position: 'relative' }}>
+              <div
+                onClick={() => setIsModelMenuOpen(!isModelMenuOpen)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '3px 8px',
+                  borderRadius: '5px',
+                  border: '1px solid var(--wb-border-subtle, rgba(255, 255, 255, 0.1))',
+                  background: 'var(--wb-bg-subtle, rgba(255, 255, 255, 0.04))',
+                  color: modelCluster.cluster_health === 'healthy' ? '#4ade80' : '#f59e0b',
+                  fontSize: '11px',
+                  cursor: 'pointer'
+                }}
+                title="点击查看大模型高可用多路熔断路由状态"
+              >
+                <span style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: modelCluster.cluster_health === 'healthy' ? '#22c55e' : '#f59e0b',
+                  boxShadow: modelCluster.cluster_health === 'healthy' ? '0 0 6px #22c55e' : 'none'
+                }} />
+                <Cpu size={11} />
+                <span style={{ color: 'var(--wb-text-bright, #fff)', fontWeight: 500 }}>
+                  {modelCluster.nodes?.[0]?.name?.split(' ')[0] || 'DeepSeek'}
+                </span>
+                <span style={{
+                  fontSize: '9.5px',
+                  padding: '0 4px',
+                  borderRadius: '3px',
+                  background: modelCluster.cluster_health === 'healthy' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                  color: modelCluster.cluster_health === 'healthy' ? '#4ade80' : '#f59e0b',
+                  fontFamily: 'monospace'
+                }}>
+                  {modelCluster.nodes?.[0]?.state || 'CLOSED'}
+                </span>
+              </div>
+
+              {/* 模型路由节点下拉卡片 */}
+              {isModelMenuOpen && (
+                <div style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 6px)',
+                  right: 0,
+                  width: '320px',
+                  background: 'var(--wb-bg-elevated, #161922)',
+                  border: '1px solid var(--wb-border-subtle, rgba(255, 255, 255, 0.12))',
+                  borderRadius: '10px',
+                  boxShadow: '0 12px 30px rgba(0,0,0,0.6)',
+                  zIndex: 1000,
+                  padding: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--wb-text-bright, #fff)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Network size={13} color="#3b82f6" />
+                      <span>LLM 主备倒换与熔断集群</span>
+                    </div>
+                    <span style={{
+                      fontSize: '10px',
+                      padding: '1px 6px',
+                      borderRadius: '4px',
+                      background: modelCluster.cluster_health === 'healthy' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                      color: modelCluster.cluster_health === 'healthy' ? '#4ade80' : '#f59e0b'
+                    }}>
+                      集群: {modelCluster.cluster_health.toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {modelCluster.nodes?.map(node => (
+                      <div key={node.id} style={{
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid rgba(255, 255, 255, 0.06)',
+                        borderRadius: '6px',
+                        padding: '8px 10px',
+                        fontSize: '11px'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ fontWeight: 600, color: 'var(--wb-text-bright, #fff)' }}>
+                            {node.priority === 1 ? '🥇 主线路: ' : '🥈 备用线路: '}{node.name}
+                          </div>
+                          <span style={{
+                            fontSize: '9px',
+                            padding: '1px 4px',
+                            borderRadius: '3px',
+                            background: node.state === 'CLOSED' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                            color: node.state === 'CLOSED' ? '#4ade80' : '#f87171'
+                          }}>
+                            {node.state}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '10px', color: 'var(--wb-text-dim, #888)', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>模型: {node.model_name}</span>
+                          <span>调用: {node.total_calls} 次 (切流: {node.total_fallovers})</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{
+                    fontSize: '10px',
+                    color: 'var(--wb-text-dim, #888)',
+                    lineHeight: 1.4,
+                    paddingTop: '6px',
+                    borderTop: '1px solid rgba(255,255,255,0.05)'
+                  }}>
+                    🛡️ <strong>容灾策略</strong>：遇 429 限流或 5xx 故障时，毫秒级指数退避并无缝倒换至备用线路，保障生产 0 业务中断。
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 3. 用户个人中心下拉菜单 (收敛治理、报告、主题与退出) */}
@@ -512,6 +678,29 @@ export default function HeaderBar({
                 >
                   <ShieldCheck size={14} />
                   <span>权限与租户治理中心</span>
+                </button>
+
+                {/* 企业知识库 */}
+                <button
+                  onClick={() => { setIsUserMenuOpen(false); onOpenKnowledge(); }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#60a5fa',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  <Database size={14} />
+                  <span>企业私有知识库中心</span>
                 </button>
 
                 {/* 能力报告 */}

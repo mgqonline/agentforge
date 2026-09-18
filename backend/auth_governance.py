@@ -851,8 +851,137 @@ def get_user_progress_map(user_id: str) -> Dict[str, Any]:
 
 
 # =====================================================================
-# 五、 快速自测与验证主函数
+# 4.5 FinOps 部门 Token 账单核算与财务对账导出中枢
 # =====================================================================
+
+TOKEN_PRICE_PER_MILLION_CNY = 1.50  # 综合商用模型折算基准: ¥1.50 / 100万 Token
+HOURS_SAVED_PER_10K_TOKENS = 0.25   # 研发效能折算: 每 1万 Token 约相当于自动化解决 0.25 人力工时
+
+def get_billing_summary() -> Dict[str, Any]:
+    """计算各租户/部门当前周期内的 Token 消耗、折算金额与节约效能"""
+    tenants_list = list_all_tenants()
+    total_tokens = sum(t["tokens_consumed"] for t in tenants_list)
+    total_budget = sum(t["monthly_token_budget"] for t in tenants_list)
+    total_cost = round((total_tokens / 1_000_000) * TOKEN_PRICE_PER_MILLION_CNY, 2)
+    total_hours = round((total_tokens / 10_000) * HOURS_SAVED_PER_10K_TOKENS, 1)
+
+    tenant_stats = []
+    for t in tenants_list:
+        c_tokens = t["tokens_consumed"]
+        budget = t["monthly_token_budget"]
+        burn_rate = round((c_tokens / budget * 100), 1) if budget > 0 else 0
+        cost = round((c_tokens / 1_000_000) * TOKEN_PRICE_PER_MILLION_CNY, 2)
+        hours = round((c_tokens / 10_000) * HOURS_SAVED_PER_10K_TOKENS, 1)
+        
+        tenant_stats.append({
+            "tenant_id": t["tenant_id"],
+            "tenant_name": t["tenant_name"],
+            "max_qps": t["max_qps"],
+            "monthly_token_budget": budget,
+            "tokens_consumed": c_tokens,
+            "tokens_remaining": max(0, budget - c_tokens),
+            "burn_rate_pct": burn_rate,
+            "cost_cny": cost,
+            "hours_saved": hours,
+            "is_exhausted": c_tokens >= budget
+        })
+
+    # 按消耗量降序排列
+    tenant_stats.sort(key=lambda x: x["tokens_consumed"], reverse=True)
+
+    return {
+        "pricing_rate_info": f"¥{TOKEN_PRICE_PER_MILLION_CNY} / 百万 Tokens",
+        "total_tokens_consumed": total_tokens,
+        "total_budget_tokens": total_budget,
+        "total_cost_cny": total_cost,
+        "total_hours_saved": total_hours,
+        "active_tenants_count": len(tenants_list),
+        "tenants": tenant_stats
+    }
+
+
+def generate_billing_csv_content(tenant_id: Optional[str] = None) -> str:
+    """生成带 UTF-8 BOM 的标准财务对账 CSV 文本"""
+    import io
+    import csv
+
+    # 查询审计流水
+    with _get_db() as conn:
+        cur = conn.cursor()
+        if tenant_id:
+            cur.execute("""
+                SELECT id, timestamp, user_id, username, tenant_id, action, details, cost_tokens, status
+                FROM audit_logs
+                WHERE tenant_id = ?
+                ORDER BY timestamp DESC
+                LIMIT 500
+            """, (tenant_id,))
+        else:
+            cur.execute("""
+                SELECT id, timestamp, user_id, username, tenant_id, action, details, cost_tokens, status
+                FROM audit_logs
+                ORDER BY timestamp DESC
+                LIMIT 500
+            """)
+        rows = [dict(r) for r in cur.fetchall()]
+
+    tenant_map = {t["tenant_id"]: t["tenant_name"] for t in list_all_tenants()}
+
+    output = io.StringIO()
+    # 写入 UTF-8 BOM
+    output.write('\ufeff')
+    writer = csv.writer(output)
+
+    # 写入表头
+    writer.writerow([
+        "交易流水号 (Transaction ID)",
+        "所属租户/部门 (Tenant)",
+        "操作账号 (Username)",
+        "功能模块/行为 (Action)",
+        "详情备注 (Details)",
+        "消耗Tokens (Tokens Consumed)",
+        "折算金额(¥) (Cost CNY)",
+        "估算节省工时(小时) (Hours Saved)",
+        "记录时间 (Timestamp)"
+    ])
+
+    if rows:
+        for r in rows:
+            tokens = r.get("cost_tokens", 0) or 0
+            cost = round((tokens / 1_000_000) * TOKEN_PRICE_PER_MILLION_CNY, 4)
+            hours = round((tokens / 10_000) * HOURS_SAVED_PER_10K_TOKENS, 2)
+            t_name = tenant_map.get(r["tenant_id"], r["tenant_id"])
+            writer.writerow([
+                r["id"],
+                t_name,
+                r["username"],
+                r["action"],
+                (r.get("details") or "").replace("\n", " "),
+                tokens,
+                cost,
+                hours,
+                r.get("timestamp", "")
+            ])
+    else:
+        # 如果当前无细粒度日志，导出当前租户账单汇总行
+        summary = get_billing_summary()
+        for t in summary["tenants"]:
+            if tenant_id and t["tenant_id"] != tenant_id:
+                continue
+            writer.writerow([
+                f"SUMMARY-{t['tenant_id']}",
+                t["tenant_name"],
+                "SYSTEM_AGGREGATE",
+                "月度累积对账",
+                f"月度配额 {t['monthly_token_budget']} Tokens，已用 {t['burn_rate_pct']}%",
+                t["tokens_consumed"],
+                t["cost_cny"],
+                t["hours_saved"],
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            ])
+
+    return output.getvalue()
+
 
 if __name__ == "__main__":
     print("=" * 70)

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, Users, Key, Sliders, CheckCircle2, 
-  XCircle, Plus, RefreshCw, AlertTriangle, Building2, UserCheck, ShieldAlert
+  XCircle, Plus, RefreshCw, AlertTriangle, Building2, UserCheck, ShieldAlert,
+  Coins, Download, TrendingUp, DollarSign, Clock, FileSpreadsheet
 } from 'lucide-react';
 
 export default function UserRoleGovernanceModal({
@@ -12,10 +13,12 @@ export default function UserRoleGovernanceModal({
   onUpdateTenantQuota = () => {},
   onSwitchTenant = () => {},
 }) {
-  const [activeTab, setActiveTab] = useState('users'); // 'users' | 'roles' | 'budget' | 'audits'
+  const [activeTab, setActiveTab] = useState('users'); // 'users' | 'roles' | 'budget' | 'audits' | 'billing'
   const [users, setUsers] = useState([]);
   const [rolesMatrix, setRolesMatrix] = useState({});
   const [audits, setAudits] = useState([]);
+  const [billingSummary, setBillingSummary] = useState(null);
+  const [exportingBilling, setExportingBilling] = useState(false);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
@@ -61,6 +64,46 @@ export default function UserRoleGovernanceModal({
       console.error('Failed to load audits:', e);
     }
   };
+
+  const loadBillingSummary = async () => {
+    try {
+      const res = await fetch('/api/v1/governance/billing/summary');
+      const data = await res.json();
+      if (data.status === 'success') {
+        setBillingSummary(data.billing || null);
+      }
+    } catch (e) {
+      console.error('Failed to load billing summary:', e);
+    }
+  };
+
+  const handleExportBillingCsv = async (tenantId = null) => {
+    setExportingBilling(true);
+    try {
+      const url = tenantId 
+        ? `/api/v1/governance/billing/export?tenant_id=${encodeURIComponent(tenantId)}`
+        : '/api/v1/governance/billing/export';
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('导出对账单失败');
+      
+      const blob = await res.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      const nowStr = new Date().toISOString().slice(0, 10);
+      a.download = `AgentForge_财务对账单_${tenantId || '全量部门'}_${nowStr}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+      setFeedback({ type: 'success', text: '对账单已成功生成并导出为 CSV 文件！' });
+    } catch (err) {
+      setFeedback({ type: 'error', text: `导出失败: ${err.message}` });
+    } finally {
+      setExportingBilling(false);
+    }
+  };
+
 
   const loadUsers = async () => {
     setLoading(true);
@@ -344,6 +387,26 @@ export default function UserRoleGovernanceModal({
           >
             <RefreshCw size={13} />
             <span>用户使用与审计流水 ({audits.length})</span>
+          </button>
+
+          <button
+            onClick={() => { setActiveTab('billing'); setFeedback(null); loadBillingSummary(); }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '6px',
+              border: 'none',
+              fontSize: '12.5px',
+              cursor: 'pointer',
+              fontWeight: 500,
+              background: activeTab === 'billing' ? 'var(--wb-accent-primary, #3b82f6)' : 'transparent',
+              color: activeTab === 'billing' ? '#fff' : 'var(--wb-text-sub, #aaa)'
+            }}
+          >
+            <Coins size={14} />
+            <span>财务账单与 FinOps (CSV导出)</span>
           </button>
         </div>
 
@@ -791,6 +854,201 @@ export default function UserRoleGovernanceModal({
                         </tr>
                       );
                     })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: 部门 Token 账单与用量 FinOps 对账导出 */}
+          {activeTab === 'billing' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ fontSize: '12.5px', color: 'var(--wb-text-sub, #aaa)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>实时跟进全公司各业务线及租户的算力支出、公允费率折算与研发工时节约对账：</span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => handleExportBillingCsv()}
+                    disabled={exportingBilling}
+                    style={{
+                      background: 'rgba(59, 130, 246, 0.2)',
+                      border: '1px solid rgba(59, 130, 246, 0.4)',
+                      borderRadius: '6px',
+                      color: '#60a5fa',
+                      padding: '5px 12px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontWeight: 500
+                    }}
+                  >
+                    <Download size={13} />
+                    <span>{exportingBilling ? '导出生成中...' : '导出全公司对账单 (CSV)'}</span>
+                  </button>
+                  <button
+                    onClick={loadBillingSummary}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      borderRadius: '6px',
+                      color: '#fff',
+                      padding: '5px 10px',
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    刷新账单
+                  </button>
+                </div>
+              </div>
+
+              {/* FinOps 顶层指标总览卡片 */}
+              {billingSummary && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid var(--wb-border-subtle, rgba(255,255,255,0.08))',
+                    borderRadius: '8px',
+                    padding: '12px 16px'
+                  }}>
+                    <div style={{ fontSize: '11px', color: 'var(--wb-text-dim, #888)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Coins size={13} style={{ color: '#fbbf24' }} />
+                      <span>本月消耗 Tokens</span>
+                    </div>
+                    <div style={{ fontSize: '18px', fontWeight: 700, color: '#fbbf24', marginTop: '4px', fontFamily: 'monospace' }}>
+                      {billingSummary.total_tokens_consumed.toLocaleString()}
+                    </div>
+                    <div style={{ fontSize: '10.5px', color: 'var(--wb-text-dim, #666)', marginTop: '2px' }}>
+                      基准: {billingSummary.pricing_rate_info}
+                    </div>
+                  </div>
+
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid var(--wb-border-subtle, rgba(255,255,255,0.08))',
+                    borderRadius: '8px',
+                    padding: '12px 16px'
+                  }}>
+                    <div style={{ fontSize: '11px', color: 'var(--wb-text-dim, #888)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <DollarSign size={13} style={{ color: '#ef4444' }} />
+                      <span>预估总算力支出</span>
+                    </div>
+                    <div style={{ fontSize: '18px', fontWeight: 700, color: '#f87171', marginTop: '4px' }}>
+                      ¥{billingSummary.total_cost_cny.toFixed(2)}
+                    </div>
+                    <div style={{ fontSize: '10.5px', color: 'var(--wb-text-dim, #666)', marginTop: '2px' }}>
+                      折算公允商业账单
+                    </div>
+                  </div>
+
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid var(--wb-border-subtle, rgba(255,255,255,0.08))',
+                    borderRadius: '8px',
+                    padding: '12px 16px'
+                  }}>
+                    <div style={{ fontSize: '11px', color: 'var(--wb-text-dim, #888)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Clock size={13} style={{ color: '#10b981' }} />
+                      <span>累计节约工时</span>
+                    </div>
+                    <div style={{ fontSize: '18px', fontWeight: 700, color: '#34d399', marginTop: '4px' }}>
+                      {billingSummary.total_hours_saved} 小时
+                    </div>
+                    <div style={{ fontSize: '10.5px', color: 'var(--wb-text-dim, #666)', marginTop: '2px' }}>
+                      AI 自动化赋能增效
+                    </div>
+                  </div>
+
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid var(--wb-border-subtle, rgba(255,255,255,0.08))',
+                    borderRadius: '8px',
+                    padding: '12px 16px'
+                  }}>
+                    <div style={{ fontSize: '11px', color: 'var(--wb-text-dim, #888)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Building2 size={13} style={{ color: '#3b82f6' }} />
+                      <span>核算租户/部门</span>
+                    </div>
+                    <div style={{ fontSize: '18px', fontWeight: 700, color: '#60a5fa', marginTop: '4px' }}>
+                      {billingSummary.active_tenants_count} 个
+                    </div>
+                    <div style={{ fontSize: '10.5px', color: 'var(--wb-text-dim, #666)', marginTop: '2px' }}>
+                      按部门多维度隔离
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 租户明细账单表格 */}
+              <div style={{
+                border: '1px solid var(--wb-border-subtle, rgba(255,255,255,0.08))',
+                borderRadius: '8px',
+                overflow: 'hidden'
+              }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--wb-text-dim, #888)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                      <th style={{ padding: '10px 14px' }}>部门 / 租户名称</th>
+                      <th style={{ padding: '10px 14px' }}>月度预算</th>
+                      <th style={{ padding: '10px 14px' }}>已消耗 Tokens</th>
+                      <th style={{ padding: '10px 14px' }}>水位进度 (Burn Rate)</th>
+                      <th style={{ padding: '10px 14px' }}>折算金额 (CNY)</th>
+                      <th style={{ padding: '10px 14px' }}>产生工时效益</th>
+                      <th style={{ padding: '10px 14px', textAlign: 'right' }}>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {billingSummary && billingSummary.tenants.map(t => (
+                      <tr key={t.tenant_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', color: 'var(--wb-text-bright, #fff)' }}>
+                        <td style={{ padding: '10px 14px' }}>
+                          <div style={{ fontWeight: 600 }}>{t.tenant_name}</div>
+                          <div style={{ fontSize: '10.5px', color: 'var(--wb-text-dim, #888)', fontFamily: 'monospace' }}>{t.tenant_id}</div>
+                        </td>
+                        <td style={{ padding: '10px 14px', fontFamily: 'monospace', color: 'var(--wb-text-sub, #aaa)' }}>
+                          {(t.monthly_token_budget / 10000).toFixed(0)} 万
+                        </td>
+                        <td style={{ padding: '10px 14px', fontFamily: 'monospace', color: '#fbbf24', fontWeight: 600 }}>
+                          {t.tokens_consumed.toLocaleString()}
+                        </td>
+                        <td style={{ padding: '10px 14px', minWidth: '150px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                              <div style={{
+                                width: `${Math.min(100, t.burn_rate_pct)}%`,
+                                height: '100%',
+                                background: t.burn_rate_pct > 90 ? '#ef4444' : t.burn_rate_pct > 60 ? '#f59e0b' : '#10b981'
+                              }} />
+                            </div>
+                            <span style={{ fontSize: '11px', color: t.burn_rate_pct > 90 ? '#ef4444' : '#aaa', width: '38px', textAlign: 'right' }}>
+                              {t.burn_rate_pct}%
+                            </span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '10px 14px', fontWeight: 600, color: '#f87171' }}>
+                          ¥{t.cost_cny.toFixed(2)}
+                        </td>
+                        <td style={{ padding: '10px 14px', color: '#34d399' }}>
+                          {t.hours_saved} 小时
+                        </td>
+                        <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                          <button
+                            onClick={() => handleExportBillingCsv(t.tenant_id)}
+                            style={{
+                              background: 'transparent',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              borderRadius: '4px',
+                              color: 'var(--wb-text-sub, #aaa)',
+                              padding: '3px 8px',
+                              fontSize: '11px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            导出本部门
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
