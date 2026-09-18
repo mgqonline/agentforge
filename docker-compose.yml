@@ -56,6 +56,7 @@ services:
       - OPENAI_API_BASE=https://api.deepseek.com
     volumes:
       - .:/app/curriculum:ro
+      - ./backend:/app/backend
       - ./chroma_db:/app/backend/chroma_db
       - ./models:/app/backend/models
       - ./logs:/app/backend/logs
@@ -83,6 +84,8 @@ services:
     ports:
       - "6002:80"
       - "6000:80"
+    volumes:
+      - ./frontend-react/dist:/usr/share/nginx/html/react:ro
     networks:
       - ailearning_net
     depends_on:
