@@ -77,7 +77,7 @@ export default function CompetencyCertificateModal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '20px',
+        padding: '24px 16px',
         overflowY: 'auto'
       }}
       onClick={onClose}
@@ -86,9 +86,11 @@ export default function CompetencyCertificateModal({
         style={{
           width: '100%',
           maxWidth: '820px',
+          maxHeight: 'min(90vh, 780px)',
+          margin: 'auto',
           background: 'var(--wb-bg-panel)',
           border: '1px solid var(--wb-border-active)',
-          borderRadius: '16px',
+          borderRadius: '14px',
           boxShadow: '0 25px 70px rgba(0,0,0,0.8), 0 0 40px rgba(59, 130, 246, 0.15)',
           display: 'flex',
           flexDirection: 'column',
@@ -104,7 +106,8 @@ export default function CompetencyCertificateModal({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: 'var(--wb-bg-header)'
+          background: 'var(--wb-bg-header)',
+          flexShrink: 0
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Award size={18} color="var(--wb-accent-primary)" />
@@ -173,7 +176,7 @@ export default function CompetencyCertificateModal({
         </div>
 
         {/* 证书主体 (含打印样式容器) */}
-        <div style={{ padding: '24px', overflowY: 'auto' }}>
+        <div style={{ padding: '16px 20px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
           <div
             ref={certRef}
             className="certificate-container"
@@ -182,11 +185,11 @@ export default function CompetencyCertificateModal({
               background: 'linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(15, 23, 42, 0.98))',
               border: '2px solid rgba(59, 130, 246, 0.4)',
               borderRadius: '12px',
-              padding: '36px 32px',
+              padding: '24px 22px',
               boxShadow: 'inset 0 0 60px rgba(59, 130, 246, 0.05)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '24px',
+              gap: '16px',
               overflow: 'hidden'
             }}
           >
@@ -385,14 +388,15 @@ export default function CompetencyCertificateModal({
 
         {/* 底部备注提示 */}
         <div style={{
-          padding: '10px 24px',
+          padding: '10px 20px',
           background: 'var(--wb-bg-subtle)',
           borderTop: '1px solid var(--wb-border-subtle)',
           fontSize: '11px',
           color: 'var(--wb-text-dim)',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between'
+          justifyContent: 'space-between',
+          flexShrink: 0
         }}>
           <span>💡 提示：支持点击右上角【打印 / 导出 PDF】保存至本地简历或企业人才库。</span>
           <span>技术支持：AgentForge 沙箱代码评测引擎</span>
