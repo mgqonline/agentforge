@@ -37,31 +37,32 @@ class GlobalErrorBoundary extends Component {
           </p>
           <div style={{ display: 'flex', gap: '12px' }}>
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => { window.location.href = '/'; }}
               style={{
                 padding: '8px 18px',
                 borderRadius: '6px',
                 border: 'none',
                 backgroundColor: '#3b82f6',
                 color: '#fff',
+                cursor: 'pointer',
+                fontWeight: 600
+              }}
+            >
+              返回主实战工作区
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                padding: '8px 18px',
+                borderRadius: '6px',
+                border: '1px solid #475569',
+                backgroundColor: 'transparent',
+                color: '#cbd5e1',
                 cursor: 'pointer'
               }}
             >
               重新加载
             </button>
-            <a
-              href="/vanilla/"
-              style={{
-                padding: '8px 18px',
-                borderRadius: '6px',
-                border: '1px solid #475569',
-                color: '#cbd5e1',
-                textDecoration: 'none',
-                display: 'inline-block'
-              }}
-            >
-              切换至原生轻量终端
-            </a>
           </div>
         </div>
       );
