@@ -4,7 +4,7 @@ import {
   PanelLeft, PanelRight, Maximize2, Trophy,
   Building2, ShieldCheck, Zap, User, ChevronDown,
   LogOut, Palette, Check, Database, Cpu, Network,
-  AlertTriangle, RotateCcw, Activity
+  AlertTriangle, RotateCcw, Activity, HelpCircle, BookOpen
 } from 'lucide-react';
 import ThemeSwitcher from './ThemeSwitcher';
 
@@ -31,7 +31,8 @@ export default function HeaderBar({
   onToggleZen = () => {},
   setMode = () => {},
   onOpenSearch = () => {},
-  onOpenReport = () => {}
+  onOpenReport = () => {},
+  onOpenOnboarding = () => {}
 }) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
@@ -661,6 +662,28 @@ export default function HeaderBar({
             <span>知识库</span>
           </button>
 
+          {/* 新手操作手册入口 */}
+          <button
+            onClick={onOpenOnboarding}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '3px 9px',
+              borderRadius: '5px',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              background: 'rgba(245, 158, 11, 0.09)',
+              color: '#fbbf24',
+              fontSize: '11.5px',
+              fontWeight: 500,
+              cursor: 'pointer'
+            }}
+            title="查看新手操作手册与通关指引"
+          >
+            <HelpCircle size={12} />
+            <span>新手指南</span>
+          </button>
+
           {/* 高可用模型集群状态指示微胶囊 (Circuit Breaker Indicator) */}
           {modelCluster && (
             <div ref={modelMenuRef} style={{ position: 'relative' }}>
@@ -967,6 +990,29 @@ export default function HeaderBar({
                 >
                   <Trophy size={14} color="#fbbf24" />
                   <span>学员全维能力报告</span>
+                </button>
+
+                {/* 新手操作手册 */}
+                <button
+                  onClick={() => { setIsUserMenuOpen(false); onOpenOnboarding(); }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#fbbf24',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  <HelpCircle size={14} color="#fbbf24" />
+                  <span>新手操作手册 & 指南</span>
                 </button>
 
                 {/* 界面主题 */}

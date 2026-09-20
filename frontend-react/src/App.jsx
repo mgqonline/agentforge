@@ -10,6 +10,7 @@ import UserRoleGovernanceModal from './components/Workbench/UserRoleGovernanceMo
 import LoginModal from './components/Workbench/LoginModal';
 import EnterpriseLoginPage from './components/Workbench/EnterpriseLoginPage';
 import KnowledgeManagerModal from './components/Workbench/KnowledgeManagerModal';
+import OnboardingGuide from './components/Workbench/OnboardingGuide';
 import './index.css';
 
 // 24 阶段离线备用数据 (开箱即用保障)
@@ -118,6 +119,14 @@ export default function App() {
     if (authData?.tenant) setCurrentTenant(authData.tenant);
     setIsAuthenticated(true);
     fetchTenantContext();
+
+    // 首次登录自动弹出新手引导
+    try {
+      const done = localStorage.getItem('agentforge_onboarding_done');
+      if (!done) {
+        setTimeout(() => setIsOnboardingOpen(true), 600);
+      }
+    } catch {}
   };
 
   // 面板折叠状态控制 (极大减轻视觉疲劳，让出大屏呼吸感)
@@ -126,6 +135,7 @@ export default function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isKnowledgeOpen, setIsKnowledgeOpen] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
 
   // 多人群主题切换 (曜石黑、北欧灰蓝、墨玉绿、纸墨白)
   const [currentTheme, setCurrentTheme] = useState('obsidian');
@@ -194,6 +204,14 @@ export default function App() {
     } catch (e) {
       console.warn('Load saved progress failed:', e);
     }
+
+    // 首次进入检测，如果未标记完成则自动弹出新手引导
+    try {
+      const onboardingDone = localStorage.getItem('agentforge_onboarding_done');
+      if (!onboardingDone) {
+        setTimeout(() => setIsOnboardingOpen(true), 800);
+      }
+    } catch {}
   }, []);
 
   // 全局 ⌘K 键盘快捷键监听
@@ -482,6 +500,7 @@ export default function App() {
         setMode={setCurrentMode}
         onOpenSearch={() => setIsSearchOpen(true)}
         onOpenReport={() => setIsReportOpen(true)}
+        onOpenOnboarding={() => setIsOnboardingOpen(true)}
       />
 
       {/* 工作台与概览切换 */}
@@ -597,6 +616,12 @@ export default function App() {
           if (authData.tenant) setCurrentTenant(authData.tenant);
           fetchTenantContext();
         }}
+      />
+
+      {/* 新手操作手册全景步进引导 */}
+      <OnboardingGuide
+        isOpen={isOnboardingOpen}
+        onClose={() => setIsOnboardingOpen(false)}
       />
     </div>
   );
