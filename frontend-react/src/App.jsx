@@ -6,6 +6,7 @@ import CodeConsole from './components/Workbench/CodeConsole';
 import DashboardView from './components/Workbench/DashboardView';
 import CommandPalette from './components/Workbench/CommandPalette';
 import CompetencyReportModal from './components/Workbench/CompetencyReportModal';
+import CompetencyCertificateModal from './components/Workbench/CompetencyCertificateModal';
 import UserRoleGovernanceModal from './components/Workbench/UserRoleGovernanceModal';
 import LoginModal from './components/Workbench/LoginModal';
 import EnterpriseLoginPage from './components/Workbench/EnterpriseLoginPage';
@@ -134,6 +135,7 @@ export default function App() {
   const [guideCollapsed, setGuideCollapsed] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isCertificateOpen, setIsCertificateOpen] = useState(false);
   const [isKnowledgeOpen, setIsKnowledgeOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
 
@@ -500,6 +502,7 @@ export default function App() {
         setMode={setCurrentMode}
         onOpenSearch={() => setIsSearchOpen(true)}
         onOpenReport={() => setIsReportOpen(true)}
+        onOpenCertificate={() => setIsCertificateOpen(true)}
         onOpenOnboarding={() => setIsOnboardingOpen(true)}
       />
 
@@ -547,6 +550,7 @@ export default function App() {
             testCode={phaseDetail?.test_code || ''}
             currentTheme={currentTheme}
             phases={phases}
+            completedPhases={completedPhases}
             codeFiles={phaseDetail?.code_files || []}
             activeCodeFile={activeCodeFile}
             onSelectCodeFile={setActiveCodeFile}
@@ -588,6 +592,17 @@ export default function App() {
         onClose={() => setIsReportOpen(false)}
         phases={phases}
         completedPhases={completedPhases}
+        onOpenCertificate={() => setIsCertificateOpen(true)}
+      />
+
+      {/* 企业级全维能力官方认证结业证书弹窗 */}
+      <CompetencyCertificateModal
+        isOpen={isCertificateOpen}
+        onClose={() => setIsCertificateOpen(false)}
+        phases={phases}
+        completedPhases={completedPhases}
+        currentUser={currentUser}
+        currentTenant={currentTenant}
       />
 
       {/* 多租户 RBAC 权限与用户维护弹窗 */}

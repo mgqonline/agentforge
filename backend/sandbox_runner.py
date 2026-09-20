@@ -4,7 +4,8 @@ import time
 import tempfile
 import subprocess
 import ast
-from typing import Dict, Any, Optional, Tuple
+import re
+from typing import Dict, Any, Optional, Tuple, List
 
 try:
     import resource
@@ -269,20 +270,110 @@ class SandboxRunner:
                 except Exception:
                     pass
 
+    def _parse_unittest_cases(self, stderr_text: str, stdout_text: str, test_code: str) -> List[Dict[str, Any]]:
+        """从 unittest 执行的标准输出或测试源码中解析出结构化的用例执行卡片"""
+        raw_output = (stderr_text or "") + "\n" + (stdout_text or "")
+        cases: List[Dict[str, Any]] = []
+
+        # 1. 优先尝试从源码中提取预期的所有 test_ 方法名，确保底表完整
+        expected_tests = re.findall(r"def\s+(test_[a-zA-Z0-9_]+)\s*\(", test_code or "")
+        seen_names = set()
+
+        # 2. 从 verbosity=2 输出中捕获每项测试的结果：test_foo (xxx) ... ok / FAIL / ERROR
+        case_pattern = re.compile(r"(test_[a-zA-Z0-9_]+)\s*\([^)]*\)\s*\.\.\.\s*(ok|FAIL|ERROR)", re.IGNORECASE)
+        for match in case_pattern.finditer(raw_output):
+            name, status_str = match.group(1), match.group(2).lower()
+            status = "passed" if status_str == "ok" else "failed"
+            seen_names.add(name)
+            cases.append({
+                "name": name,
+                "status": status,
+                "error_message": ""
+            })
+
+        # 3. 提取失败/错误详情
+        fail_blocks = re.findall(
+            r"=(?:FAIL|ERROR):\s*(test_[a-zA-Z0-9_]+)[^\n]*\n-+\n(.*?)(?=\n={10,}|\n-{10,}|\Z)",
+            raw_output,
+            re.DOTALL
+        )
+        fail_map = {}
+        for fname, fdetail in fail_blocks:
+            # 提取最后一行核心错误或 AssertionError
+            lines = [l.strip() for l in fdetail.strip().split("\n") if l.strip()]
+            err_line = lines[-1] if lines else "断言不匹配"
+            fail_map[fname] = err_line
+
+        # 为已捕获用例挂载错误信息
+        for c in cases:
+            if c["name"] in fail_map:
+                c["error_message"] = fail_map[c["name"]]
+
+        # 4. 若 verbosity 未生效（无 ok 标记），根据预期方法补全状态
+        if not cases and expected_tests:
+            is_all_passed = ("\nOK" in raw_output) or raw_output.strip().endswith("OK")
+            for tname in expected_tests:
+                if is_all_passed:
+                    cases.append({
+                        "name": tname,
+                        "status": "passed",
+                        "error_message": ""
+                    })
+                elif tname in fail_map:
+                    cases.append({
+                        "name": tname,
+                        "status": "failed",
+                        "error_message": fail_map[tname]
+                    })
+                else:
+                    cases.append({
+                        "name": tname,
+                        "status": "failed" if fail_map else "unknown",
+                        "error_message": "测试未执行或提前中断"
+                    })
+
+        return cases
+
     def verify_code(self, user_code: str, test_code: str, timeout: int = 90) -> Dict[str, Any]:
-        """将用户实现与测试用例拼接执行并收集评测结果"""
+        """将用户实现与测试用例拼接执行并收集评测结果 (已增强结构化断言解析)"""
+        # 确保 unittest.main 默认开启 verbosity=2，输出详细测试用例
+        wrapped_test_code = test_code
+        if "unittest.main()" in wrapped_test_code:
+            wrapped_test_code = wrapped_test_code.replace("unittest.main()", "unittest.main(verbosity=2)")
+        elif "unittest.main" in wrapped_test_code and "verbosity" not in wrapped_test_code:
+            wrapped_test_code = re.sub(r"unittest\.main\s*\((.*?)\)", r"unittest.main(\1, verbosity=2)", wrapped_test_code)
+
         combined_code = f"""
 # --- USER CODE ---
 {user_code}
 
 # --- TEST SUITE ---
-{test_code}
+{wrapped_test_code}
 """
         res = self.run_code(combined_code, timeout=timeout)
         passed = (res["status"] == "success" and res["exit_code"] == 0)
         
+        # 结构化抽取用例结果
+        stderr_output = res.get("stderr", "") or res.get("error", "")
+        stdout_output = res.get("stdout", "") or res.get("output", "")
+        test_cases = self._parse_unittest_cases(stderr_output, stdout_output, test_code)
+        
+        total_count = len(test_cases)
+        passed_count = sum(1 for c in test_cases if c.get("status") == "passed")
+        failed_count = total_count - passed_count
+        
+        summary = {
+            "total": total_count,
+            "passed": passed_count,
+            "failed": failed_count,
+            "pass_rate": f"{round(passed_count / total_count * 100)}%" if total_count > 0 else ("100%" if passed else "0%"),
+            "duration_ms": res.get("execution_time_ms", 0)
+        }
+
         return {
             "passed": passed,
             "details": res,
-            "message": "所有单元测试通过！关卡已点亮 🎉" if passed else "测试未全部通过，请查看终端报错或求助 AI 导师。"
+            "message": "所有单元测试通过！关卡已点亮 🎉" if passed else "测试未全部通过，请查看测试断言卡片或求助 AI 导师。",
+            "test_cases": test_cases,
+            "summary": summary
         }

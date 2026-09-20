@@ -32,6 +32,7 @@ export default function HeaderBar({
   setMode = () => {},
   onOpenSearch = () => {},
   onOpenReport = () => {},
+  onOpenCertificate = () => {},
   onOpenOnboarding = () => {}
 }) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -992,6 +993,29 @@ export default function HeaderBar({
                 >
                   <Trophy size={14} color="#fbbf24" />
                   <span>学员全维能力报告</span>
+                </button>
+
+                {/* 官方能力认证证书 */}
+                <button
+                  onClick={() => { setIsUserMenuOpen(false); onOpenCertificate(); }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--wb-text-bright, #fff)',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  <Award size={14} color="#60a5fa" />
+                  <span>AI 架构能力官方证书</span>
                 </button>
 
                 {/* 新手操作手册 */}

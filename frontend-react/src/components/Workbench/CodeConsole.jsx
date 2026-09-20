@@ -7,9 +7,10 @@ import {
   Maximize2, Minimize2, GripHorizontal, Award, RefreshCw, Send,
   ShieldCheck, AlertTriangle, Lightbulb, Save, Undo2, AlertCircle, X,
   GitCompare, ArrowRight, BookOpen, Lock, Unlock, Building2, Zap, Image, Eye,
-  Search, FileCode, Check, Code2, Trash2, Filter
+  Search, FileCode, Check, Code2, Trash2, Filter, Layers, ListFilter, CheckSquare
 } from 'lucide-react';
 import { PYTHON_METHODS_CATALOG, getPythonCompletionItems, getPythonHoverInfo } from './pythonCompletionData';
+import CompetencyCertificateModal from './CompetencyCertificateModal';
 
 export default function CodeConsole({
   phaseId = '',
@@ -22,6 +23,7 @@ export default function CodeConsole({
   testCode = '',
   currentTheme = 'obsidian',
   phases = [],
+  completedPhases = {},
   codeFiles = [],
   activeCodeFile = null,
   onSelectCodeFile = () => {},
@@ -37,6 +39,11 @@ export default function CodeConsole({
   const [code, setCode] = useState(starterCode);
   const [activeTab, setActiveTab] = useState('terminal'); // 'terminal' | 'test' | 'mentor'
   const [isRunning, setIsRunning] = useState(false);
+
+  // 测试视图模式: 'cards' (结构化断言卡片) | 'raw' (原始沙箱日志)
+  const [testViewMode, setTestViewMode] = useState('cards');
+  // 全维能力结业证书弹窗
+  const [showCertificateModal, setShowCertificateModal] = useState(false);
 
   // 草稿箱与持久化状态体系 (Phase 2A)
   const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
@@ -644,6 +651,27 @@ export default function CodeConsole({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [code, phaseId, starterCode]);
+
+  // 通关成功弹窗全局快捷键监听 (Enter / Space 开启下一关，Escape 关闭)
+  useEffect(() => {
+    if (!showSuccessModal) return;
+    const handleSuccessModalKey = (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (successStats?.nextPhase) {
+          setShowSuccessModal(false);
+          onNavigatePhase(successStats.nextPhase.id);
+        } else {
+          setShowSuccessModal(false);
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowSuccessModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleSuccessModalKey);
+    return () => window.removeEventListener('keydown', handleSuccessModalKey);
+  }, [showSuccessModal, successStats, onNavigatePhase]);
 
   const handleRunCode = async () => {
     if (isRunning) return;
@@ -1847,24 +1875,37 @@ export default function CodeConsole({
 
             {/* 底部动作按钮栏 */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginTop: '6px' }}>
-              <button
-                onClick={() => {
-                  setShowSuccessModal(false);
-                  handleAskMentor('恭喜通关！请对当前满分代码进行架构级 Code Review 与企业级生产落地建议');
-                }}
-                className="wb-btn-ghost"
-                style={{ fontSize: '11.5px', padding: '6px 12px' }}
-                title="请大模型导师深度解析代码进阶优化空间"
-              >
-                <Sparkles size={12} />
-                <span>导师进阶复盘</span>
-              </button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    handleAskMentor('恭喜通关！请对当前满分代码进行架构级 Code Review 与企业级生产落地建议');
+                  }}
+                  className="wb-btn-ghost"
+                  style={{ fontSize: '11.5px', padding: '6px 10px' }}
+                  title="请大模型导师深度解析代码进阶优化空间"
+                >
+                  <Sparkles size={12} />
+                  <span>导师复盘</span>
+                </button>
+
+                <button
+                  onClick={() => setShowCertificateModal(true)}
+                  className="wb-btn-ghost"
+                  style={{ fontSize: '11.5px', padding: '6px 10px', color: 'var(--wb-accent-subtle)' }}
+                  title="查看与导出企业级全维能力官方认证证书"
+                >
+                  <Award size={12} />
+                  <span>认证证书</span>
+                </button>
+              </div>
 
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   onClick={() => setShowSuccessModal(false)}
                   className="wb-btn-ghost"
                   style={{ fontSize: '11.5px', padding: '6px 12px' }}
+                  title="按 Esc 键关闭"
                 >
                   留在本关
                 </button>
@@ -1885,11 +1926,13 @@ export default function CodeConsole({
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '5px',
+                      gap: '6px',
                       boxShadow: '0 2px 10px rgba(34, 197, 94, 0.3)'
                     }}
+                    title="按 Enter 或 空格 键快速开启"
                   >
                     <span>开启下一关</span>
+                    <span style={{ fontSize: '10px', opacity: 0.75, background: 'rgba(0,0,0,0.25)', padding: '1px 5px', borderRadius: '3px' }}>↵</span>
                     <ArrowRight size={13} />
                   </button>
                 )}
@@ -2853,95 +2896,428 @@ export default function CodeConsole({
             {activeTab === 'test' && (
               <div>
                 {!verifyResult ? (
-                  <div style={{ color: 'var(--wb-text-dim)', fontSize: '12px' }}>
-                    点击【验证通关】开始跑当前阶段自动化单元测试。
+                  <div style={{ color: 'var(--wb-text-dim)', fontSize: '12px', padding: '12px 0' }}>
+                    点击上方【验证通关】开始跑当前阶段自动化单元测试与沙箱代码断言。
                   </div>
-                ) : (
-                  <div>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      marginBottom: '8px',
-                      fontSize: '12px',
-                      color: verifyResult.passed ? '#4ade80' : '#fb7185'
-                    }}>
-                      {verifyResult.passed ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
-                      <span style={{ fontWeight: 500 }}>{verifyResult.message}</span>
-                    </div>
+                ) : (() => {
+                  const testCases = verifyResult.test_cases || [];
+                  const testSummary = verifyResult.summary || {
+                    total: testCases.length || verifyResult.details?.total_tests || 0,
+                    passed: verifyResult.details?.passed_tests ?? (verifyResult.passed ? testCases.length : 0),
+                    failed: (verifyResult.details?.failures || 0) + (verifyResult.details?.errors || 0)
+                  };
+                  const totalCount = testSummary.total || testCases.length || (verifyResult.passed ? 1 : 0);
+                  const passedCount = testSummary.passed ?? (verifyResult.passed ? totalCount : 0);
+                  const failedCount = testSummary.failed ?? (verifyResult.passed ? 0 : Math.max(1, totalCount - passedCount));
+                  const passRate = totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : (verifyResult.passed ? 100 : 0);
+                  const executionTimeMs = verifyResult.details?.execution_time_ms ?? 0;
 
-                    {verifyResult.details?.stdout && (
-                      <pre style={{ color: 'var(--wb-text-normal)', fontSize: '11.5px', whiteSpace: 'pre-wrap', margin: 0 }}>
-                        {verifyResult.details.stdout}
-                      </pre>
-                    )}
-                    {verifyResult.details?.stderr && (
-                      <div style={{ color: '#fb7185', fontSize: '11.5px', marginTop: '4px' }}>
-                        {renderInteractiveStderr(verifyResult.details.stderr)}
-                      </div>
-                    )}
+                  const formatCaseName = (rawName) => {
+                    if (!rawName) return '测试用例';
+                    const clean = rawName.replace(/^test_/, '');
+                    return clean.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                  };
 
-                    {/* 💡 测试未通过时的 AI 导师启发式排障支架卡片 */}
-                    {!verifyResult.passed && (
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {/* 1. 测试概览与汇总状态条 (Summary Bar) */}
                       <div style={{
-                        marginTop: '14px',
-                        padding: '12px 14px',
-                        background: 'rgba(239, 68, 68, 0.05)',
-                        border: '1px solid rgba(239, 68, 68, 0.22)',
-                        borderRadius: '8px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
+                        padding: '10px 14px',
+                        background: verifyResult.passed ? 'rgba(34, 197, 94, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+                        border: `1px solid ${verifyResult.passed ? 'rgba(34, 197, 94, 0.28)' : 'rgba(239, 68, 68, 0.28)'}`,
+                        borderRadius: '8px',
                         gap: '12px',
-                        animation: 'fadeIn 0.2s ease'
+                        flexWrap: 'wrap'
                       }}>
+                        {/* 状态徽章与主提示 */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <div style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '8px',
-                            background: 'rgba(59, 130, 246, 0.15)',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '6px',
+                            background: verifyResult.passed ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            flexShrink: 0
+                            color: verifyResult.passed ? 'var(--wb-accent-success)' : '#ef4444'
                           }}>
-                            <Sparkles size={16} color="var(--wb-accent-primary)" />
+                            {verifyResult.passed ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
                           </div>
                           <div>
-                            <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--wb-text-bright)' }}>
-                              测试未通过？呼叫 AI 导师启发式排障
+                            <div style={{
+                              fontSize: '13px',
+                              fontWeight: 600,
+                              color: verifyResult.passed ? 'var(--wb-accent-success)' : '#f87171'
+                            }}>
+                              {verifyResult.passed ? '🎉 自动化单元测试全数通过' : '⚠️ 单元测试未全数通过'}
                             </div>
-                            <div style={{ fontSize: '11px', color: 'var(--wb-text-dim)', marginTop: '2px' }}>
-                              深入分析断言与逻辑偏差，提供思考支架与排查线索（严禁直接泄题，助您自主攻克）
+                            <div style={{ fontSize: '11px', color: 'var(--wb-text-dim)', marginTop: '1px' }}>
+                              {verifyResult.message || '沙箱评测执行完毕'}
                             </div>
                           </div>
                         </div>
-                        <button
-                          onClick={() => handleAskMentor('当前关卡自动化单元测试未通过，请为我进行苏格拉底式启发排障，指出逻辑偏差但不要直接给出答案代码。')}
-                          style={{
-                            background: 'var(--wb-accent-subtle)',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '6px',
-                            padding: '6px 14px',
-                            fontSize: '11.5px',
-                            fontWeight: 500,
-                            cursor: 'pointer',
+
+                        {/* 指标统计与视图切换按钮 */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          {/* 统计指标 pill 组 */}
+                          <div style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '5px',
-                            flexShrink: 0,
-                            boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
-                          }}
-                        >
-                          <Sparkles size={13} />
-                          <span>一键启发式排障</span>
-                        </button>
+                            gap: '8px',
+                            background: 'var(--wb-bg-panel)',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--wb-border-subtle)',
+                            fontSize: '11px'
+                          }}>
+                            <span style={{ color: 'var(--wb-text-sub)' }}>
+                              用例: <strong style={{ color: 'var(--wb-text-bright)' }}>{passedCount}/{totalCount}</strong>
+                            </span>
+                            <span style={{ color: 'var(--wb-border-subtle)' }}>|</span>
+                            <span style={{ color: verifyResult.passed ? 'var(--wb-accent-success)' : '#f87171', fontWeight: 600 }}>
+                              通过率: {passRate}%
+                            </span>
+                            <span style={{ color: 'var(--wb-border-subtle)' }}>|</span>
+                            <span style={{ color: 'var(--wb-text-dim)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <Clock size={11} />
+                              {executionTimeMs} ms
+                            </span>
+                          </div>
+
+                          {/* 模式分段器 (卡片视图 / 原始日志) */}
+                          <div style={{
+                            display: 'flex',
+                            background: 'var(--wb-bg-panel)',
+                            border: '1px solid var(--wb-border-subtle)',
+                            borderRadius: '6px',
+                            padding: '2px',
+                            gap: '2px'
+                          }}>
+                            <button
+                              onClick={() => setTestViewMode('cards')}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                background: testViewMode === 'cards' ? 'var(--wb-bg-subtle)' : 'transparent',
+                                border: 'none',
+                                borderRadius: '4px',
+                                padding: '4px 8px',
+                                fontSize: '11px',
+                                fontWeight: testViewMode === 'cards' ? 600 : 400,
+                                color: testViewMode === 'cards' ? 'var(--wb-text-bright)' : 'var(--wb-text-dim)',
+                                cursor: 'pointer'
+                              }}
+                              title="查看结构化断言卡片网格"
+                            >
+                              <Layers size={12} />
+                              <span>断言卡片</span>
+                            </button>
+                            <button
+                              onClick={() => setTestViewMode('raw')}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                background: testViewMode === 'raw' ? 'var(--wb-bg-subtle)' : 'transparent',
+                                border: 'none',
+                                borderRadius: '4px',
+                                padding: '4px 8px',
+                                fontSize: '11px',
+                                fontWeight: testViewMode === 'raw' ? 600 : 400,
+                                color: testViewMode === 'raw' ? 'var(--wb-text-bright)' : 'var(--wb-text-dim)',
+                                cursor: 'pointer'
+                              }}
+                              title="查看沙箱底层终端日志输出"
+                            >
+                              <Terminal size={12} />
+                              <span>原始日志</span>
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                )}
+
+                      {/* 2. 卡片视图模式 (Assertion Cards Grid) */}
+                      {testViewMode === 'cards' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {/* 通过率细线进度条 */}
+                          <div style={{
+                            height: '4px',
+                            width: '100%',
+                            background: 'rgba(255, 255, 255, 0.06)',
+                            borderRadius: '2px',
+                            overflow: 'hidden'
+                          }}>
+                            <div style={{
+                              height: '100%',
+                              width: `${passRate}%`,
+                              background: verifyResult.passed ? 'var(--wb-accent-success)' : 'linear-gradient(90deg, #22c55e, #ef4444)',
+                              transition: 'width 0.3s ease'
+                            }} />
+                          </div>
+
+                          {/* 测试用例断言卡片列表 */}
+                          {testCases.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              {testCases.map((tc, idx) => {
+                                const isPassed = tc.status === 'passed';
+                                return (
+                                  <div
+                                    key={tc.name || idx}
+                                    style={{
+                                      background: 'var(--wb-bg-subtle)',
+                                      border: `1px solid ${isPassed ? 'rgba(34, 197, 94, 0.25)' : 'rgba(239, 68, 68, 0.35)'}`,
+                                      borderRadius: '8px',
+                                      padding: '12px 14px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '8px',
+                                      transition: 'all 0.2s ease'
+                                    }}
+                                  >
+                                    {/* 用例头部：状态、友好标题、原函数名与标签 */}
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        {isPassed ? (
+                                          <CheckCircle2 size={16} color="var(--wb-accent-success)" />
+                                        ) : (
+                                          <XCircle size={16} color="#ef4444" />
+                                        )}
+                                        <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--wb-text-bright)' }}>
+                                          {formatCaseName(tc.name)}
+                                        </div>
+                                        <span style={{
+                                          fontSize: '10.5px',
+                                          fontFamily: 'monospace',
+                                          color: 'var(--wb-text-dim)',
+                                          background: 'rgba(0,0,0,0.2)',
+                                          padding: '1px 5px',
+                                          borderRadius: '3px'
+                                        }}>
+                                          {tc.name}
+                                        </span>
+                                      </div>
+
+                                      <div style={{
+                                        fontSize: '10.5px',
+                                        fontWeight: 600,
+                                        padding: '2px 8px',
+                                        borderRadius: '10px',
+                                        background: isPassed ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                        color: isPassed ? 'var(--wb-accent-success)' : '#f87171',
+                                        border: `1px solid ${isPassed ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                                      }}>
+                                        {isPassed ? 'PASSED' : 'FAILED'}
+                                      </div>
+                                    </div>
+
+                                    {/* 若未通过：展示结构化断言错误信息与定向导师启发排障按钮 */}
+                                    {!isPassed && (
+                                      <div style={{
+                                        background: 'rgba(0, 0, 0, 0.35)',
+                                        border: '1px solid rgba(239, 68, 68, 0.2)',
+                                        borderRadius: '6px',
+                                        padding: '8px 10px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '6px'
+                                      }}>
+                                        <div style={{
+                                          fontSize: '11px',
+                                          fontFamily: 'monospace',
+                                          color: '#fca5a5',
+                                          whiteSpace: 'pre-wrap',
+                                          maxHeight: '140px',
+                                          overflowY: 'auto'
+                                        }}>
+                                          {tc.error_message || '断言未达成预期或抛出异常'}
+                                        </div>
+
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '4px' }}>
+                                          <button
+                                            onClick={() => handleAskMentor(`在当前关卡自动化测试中，用例【${tc.name}】未通过，错误断言信息如下：\n${tc.error_message || '断言失败'}\n请针对该用例的测试预期进行苏格拉底式启发排障，指出逻辑偏差但切勿直接给出答案代码。`)}
+                                            style={{
+                                              background: 'rgba(59, 130, 246, 0.15)',
+                                              border: '1px solid rgba(59, 130, 246, 0.3)',
+                                              color: 'var(--wb-accent-primary)',
+                                              borderRadius: '5px',
+                                              padding: '4px 10px',
+                                              fontSize: '11px',
+                                              fontWeight: 500,
+                                              cursor: 'pointer',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '4px',
+                                              transition: 'background 0.2s'
+                                            }}
+                                            title="针对此具体测试用例呼叫 AI 导师定向排障"
+                                          >
+                                            <Sparkles size={12} />
+                                            <span>针对此用例呼叫导师启发排障</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            /* 若测试未产生用例（如语法错误/导入崩溃），展示异常分析卡片 */
+                            <div style={{
+                              background: 'var(--wb-bg-subtle)',
+                              border: '1px solid rgba(245, 158, 11, 0.3)',
+                              borderRadius: '8px',
+                              padding: '14px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '8px'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b' }}>
+                                <AlertTriangle size={16} />
+                                <span style={{ fontSize: '12.5px', fontWeight: 600 }}>
+                                  沙箱执行异常（未进入单元测试流程）
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--wb-text-sub)' }}>
+                                代码在编译、模块导入或沙箱初始化阶段提前退出，未能成功执行测试用例：
+                              </div>
+                              {(verifyResult.details?.stderr || verifyResult.details?.stdout) && (
+                                <div style={{
+                                  background: 'rgba(0, 0, 0, 0.35)',
+                                  borderRadius: '6px',
+                                  padding: '8px 10px',
+                                  fontSize: '11.5px',
+                                  color: '#fb7185'
+                                }}>
+                                  {renderInteractiveStderr(verifyResult.details?.stderr || verifyResult.details?.stdout)}
+                                </div>
+                              )}
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                                <button
+                                  onClick={() => handleAskMentor('当前代码在沙箱执行阶段抛出语法或环境异常，未能进入单元测试套件。请为我分析报错原因并给出修改线索。')}
+                                  style={{
+                                    background: 'var(--wb-accent-subtle)',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '5px',
+                                    padding: '5px 12px',
+                                    fontSize: '11px',
+                                    fontWeight: 500,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  <Sparkles size={12} />
+                                  <span>呼叫 AI 导师分析此执行异常</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 💡 底部全局排障兜底卡片 (测试未全数通过时常驻) */}
+                          {!verifyResult.passed && (
+                            <div style={{
+                              marginTop: '4px',
+                              padding: '10px 14px',
+                              background: 'rgba(239, 68, 68, 0.05)',
+                              border: '1px solid rgba(239, 68, 68, 0.22)',
+                              borderRadius: '8px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '12px'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{
+                                  width: '28px',
+                                  height: '28px',
+                                  borderRadius: '6px',
+                                  background: 'rgba(59, 130, 246, 0.15)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  <Sparkles size={15} color="var(--wb-accent-primary)" />
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--wb-text-bright)' }}>
+                                    仍有断言未攻克？呼叫 AI 导师全链路启发
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: 'var(--wb-text-dim)', marginTop: '1px' }}>
+                                    基于当前全量代码与测试反馈，提供思考阶梯与自检线索（严禁泄题，助您自主通关）
+                                  </div>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleAskMentor('当前关卡自动化单元测试未完全通过，请结合所有失败断言为我进行全链路苏格拉底式启发排障，指出思维盲区但不要直接给出答案代码。')}
+                                style={{
+                                  background: 'var(--wb-accent-subtle)',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  padding: '5px 12px',
+                                  fontSize: '11px',
+                                  fontWeight: 500,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  flexShrink: 0,
+                                  boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
+                                }}
+                              >
+                                <Sparkles size={12} />
+                                <span>一键全链路排障</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* 3. 原始日志视图模式 (Raw Log View) */}
+                      {testViewMode === 'raw' && (
+                        <div style={{
+                          background: 'rgba(0, 0, 0, 0.4)',
+                          borderRadius: '8px',
+                          border: '1px solid var(--wb-border-subtle)',
+                          padding: '12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px'
+                        }}>
+                          {verifyResult.details?.stdout && (
+                            <div>
+                              <div style={{ fontSize: '10.5px', color: 'var(--wb-text-dim)', marginBottom: '4px' }}>标准输出 (STDOUT):</div>
+                              <pre style={{ color: 'var(--wb-text-normal)', fontSize: '11.5px', whiteSpace: 'pre-wrap', margin: 0 }}>
+                                {verifyResult.details.stdout}
+                              </pre>
+                            </div>
+                          )}
+                          {verifyResult.details?.stderr && (
+                            <div style={{ marginTop: '4px' }}>
+                              <div style={{ fontSize: '10.5px', color: 'var(--wb-text-dim)', marginBottom: '4px' }}>标准错误 / 异常堆栈 (STDERR):</div>
+                              <div style={{ color: '#fb7185', fontSize: '11.5px' }}>
+                                {renderInteractiveStderr(verifyResult.details.stderr)}
+                              </div>
+                            </div>
+                          )}
+                          {!verifyResult.details?.stdout && !verifyResult.details?.stderr && (
+                            <div style={{ fontSize: '11.5px', color: 'var(--wb-text-dim)' }}>
+                              沙箱没有输出更多原始日志。
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -3482,6 +3858,16 @@ export default function CodeConsole({
           </div>
         )}
       </div>
+
+      {/* 企业级全维能力官方认证结业证书弹窗 */}
+      <CompetencyCertificateModal
+        isOpen={showCertificateModal}
+        onClose={() => setShowCertificateModal(false)}
+        phases={phases}
+        completedPhases={completedPhases}
+        currentUser={currentUser}
+        currentTenant={currentTenant}
+      />
     </main>
   );
 }

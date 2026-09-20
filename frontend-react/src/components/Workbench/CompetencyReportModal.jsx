@@ -63,7 +63,8 @@ export default function CompetencyReportModal({
   isOpen = false,
   onClose = () => {},
   phases = [],
-  completedPhases = {}
+  completedPhases = {},
+  onOpenCertificate = () => {}
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -302,6 +303,32 @@ export default function CompetencyReportModal({
               <Printer size={12} />
               <span>打印 PDF</span>
             </button>
+
+            {onOpenCertificate && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenCertificate();
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(34, 197, 94, 0.2))',
+                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                  color: '#ffffff',
+                  borderRadius: '6px',
+                  padding: '4px 10px',
+                  fontSize: '11.5px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                title="查看与导出企业级全维能力官方认证证书"
+              >
+                <Award size={12} color="#60a5fa" />
+                <span>官方结业证书</span>
+              </button>
+            )}
 
             <button
               onClick={onClose}
