@@ -1674,6 +1674,30 @@ body.dark-workbench {
   border-color: var(--wb-border-subtle);
 }
 
+/* 紧凑图标微按钮 */
+.wb-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--wb-text-sub);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.wb-icon-btn:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-bright);
+}
+.wb-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* 极客终端面板 */
 .wb-terminal {
   background: var(--wb-bg-root);

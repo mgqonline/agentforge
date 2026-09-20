@@ -1246,7 +1246,7 @@ export default function CodeConsole({
               <>
                 <CheckCircle2 size={10} style={{ color: 'var(--wb-accent-success)' }} />
                 <span style={{ color: 'var(--wb-text-sub)' }}>
-                  草稿已保存 {draftUpdatedAt ? formatDraftTime(draftUpdatedAt) : ''}
+                  已暂存 {draftUpdatedAt ? formatDraftTime(draftUpdatedAt) : ''}
                 </span>
               </>
             ) : (
@@ -1277,145 +1277,154 @@ export default function CodeConsole({
         </div>
 
         {/* 动作按钮组 */}
+        {/* 动作按钮组 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {/* 参考对比按钮 (Phase 2B) */}
-          <button
-            onClick={handleToggleDiff}
-            className="wb-btn-ghost"
-            style={{
-              borderColor: isDiffMode ? 'var(--wb-accent-subtle)' : undefined,
-              color: isDiffMode ? 'var(--wb-accent-subtle)' : undefined,
-              background: isDiffMode ? 'var(--wb-bg-hover)' : undefined
-            }}
-            title={isDiffMode ? "退出差异对比，返回常规代码编辑" : "与官方标准参考实现进行 Diff 差异对比"}
-          >
-            <GitCompare size={12} />
-            <span>{isDiffMode ? '退出对比' : '参考对比'}</span>
-          </button>
-
-          {/* 当处于对比模式时，显示一键采纳标准答案按钮 */}
-          {isDiffMode && (
+          {/* 1. 对比与速查工具组 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {/* 参考对比按钮 */}
             <button
-              onClick={handleAdoptSolution}
+              onClick={handleToggleDiff}
               className="wb-btn-ghost"
               style={{
-                borderColor: 'var(--wb-accent-success)',
-                color: 'var(--wb-accent-success)',
-                background: 'var(--wb-bg-hover)'
+                fontSize: '11px',
+                padding: '2px 7px',
+                borderColor: isDiffMode ? 'var(--wb-accent-subtle)' : 'var(--wb-border-subtle)',
+                color: isDiffMode ? 'var(--wb-accent-subtle)' : 'var(--wb-text-sub)',
+                background: isDiffMode ? 'var(--wb-bg-hover)' : 'var(--wb-bg-subtle)'
               }}
-              title="将官方标准参考答案同步覆盖至当前工作区草稿"
+              title={isDiffMode ? "退出差异对比，返回常规代码编辑" : "与官方标准参考实现进行 Diff 差异对比"}
             >
-              <Sparkles size={11} />
-              <span>采纳标准答案</span>
+              <GitCompare size={11} />
+              <span>{isDiffMode ? '退出对比' : 'Diff对比'}</span>
             </button>
-          )}
 
-          {/* 重置初始模板 */}
-          <button
-            onClick={handleResetClick}
-            className="wb-btn-ghost"
-            title="重置为官方初始模板代码"
-          >
-            <RotateCcw size={12} />
-            <span>重置</span>
-          </button>
+            {/* 当处于对比模式时，显示一键采纳标准答案按钮 */}
+            {isDiffMode && (
+              <button
+                onClick={handleAdoptSolution}
+                className="wb-btn-ghost"
+                style={{
+                  fontSize: '11px',
+                  padding: '2px 7px',
+                  borderColor: 'var(--wb-accent-success)',
+                  color: 'var(--wb-accent-success)',
+                  background: 'var(--wb-bg-hover)'
+                }}
+                title="将官方标准参考答案同步覆盖至当前工作区草稿"
+              >
+                <Sparkles size={11} />
+                <span>采纳答案</span>
+              </button>
+            )}
 
-          {/* 立即保存草稿 */}
-          <button
-            onClick={handleSaveImmediately}
-            className="wb-btn-ghost"
-            title="立即将当前代码保存到本地草稿箱 (快捷键 ⌘S)"
-          >
-            <Save size={12} />
-            <span>暂存</span>
-            <kbd style={{ fontSize: '9.5px', color: 'var(--wb-text-dim)' }}>⌘S</kbd>
-          </button>
+            {/* 代码方法自动提醒与速查助手按钮 (精简版，告别冗余徽章) */}
+            <button
+              onClick={() => setShowMethodAssistDrawer(!showMethodAssistDrawer)}
+              className="wb-btn-ghost"
+              style={{
+                fontSize: '11px',
+                padding: '2px 7px',
+                background: showMethodAssistDrawer ? 'rgba(56, 189, 248, 0.16)' : 'var(--wb-bg-subtle)',
+                borderColor: showMethodAssistDrawer ? 'rgba(56, 189, 248, 0.45)' : 'var(--wb-border-subtle)',
+                color: showMethodAssistDrawer ? 'var(--wb-accent-primary, #38bdf8)' : 'var(--wb-text-sub)'
+              }}
+              title={showMethodAssistDrawer ? "收起代码方法快捷助手面板" : "展开 Python / LangGraph 核心代码方法自动快捷速查抽屉"}
+            >
+              <Sparkles size={11} color={showMethodAssistDrawer ? '#38bdf8' : 'var(--wb-accent-primary)'} />
+              <span>方法速查</span>
+            </button>
+          </div>
 
-          {/* 复制代码 */}
-          <button
-            onClick={handleCopy}
-            className="wb-btn-ghost"
-            title="复制代码"
-          >
-            <Copy size={12} />
-            <span>{copied ? '已复制' : '复制'}</span>
-          </button>
+          {/* 细微分隔符 */}
+          <span style={{ width: '1px', height: '14px', background: 'var(--wb-border-subtle, rgba(255,255,255,0.1))', margin: '0 1px' }} />
 
-          {/* 代码方法自动提醒与速查助手按钮 */}
-          <button
-            onClick={() => setShowMethodAssistDrawer(!showMethodAssistDrawer)}
-            className="wb-btn-ghost"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              background: showMethodAssistDrawer ? 'rgba(56, 189, 248, 0.16)' : 'var(--wb-bg-subtle)',
-              borderColor: showMethodAssistDrawer ? 'rgba(56, 189, 248, 0.45)' : 'var(--wb-border-subtle)',
-              color: showMethodAssistDrawer ? 'var(--wb-accent-primary, #38bdf8)' : 'var(--wb-text-bright)',
-              fontSize: '11.5px',
-              padding: '3px 9px',
-              borderRadius: '5px',
-              transition: 'all 0.2s ease'
-            }}
-            title={showMethodAssistDrawer ? "收起代码方法快捷助手面板" : "展开 Python / LangGraph / RAG 核心代码方法自动快捷提醒与速查抽屉"}
-          >
-            <Sparkles size={12} color={showMethodAssistDrawer ? '#38bdf8' : 'currentColor'} />
-            <span>方法快捷提醒</span>
-            <span style={{
-              background: 'rgba(56, 189, 248, 0.2)',
-              color: '#38bdf8',
-              fontSize: '9.5px',
-              padding: '1px 5px',
-              borderRadius: '8px',
-              fontWeight: 600
-            }}>
-              自动提示
-            </span>
-          </button>
+          {/* 2. 编辑器基础工具图标组：重置、暂存、复制 (紧凑高颜值) */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            background: 'var(--wb-bg-subtle, rgba(255, 255, 255, 0.04))',
+            border: '1px solid var(--wb-border-subtle, rgba(255, 255, 255, 0.08))',
+            borderRadius: '5px',
+            padding: '1px 2px',
+            gap: '1px'
+          }}>
+            <button
+              onClick={handleResetClick}
+              className="wb-icon-btn"
+              title="重置为官方初始模板代码"
+            >
+              <RotateCcw size={12} />
+            </button>
 
-          {/* 运行按钮 */}
-          <button
-            onClick={handleRunCode}
-            disabled={isRunning}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              background: 'var(--wb-bg-subtle)',
-              border: '1px solid var(--wb-border-subtle)',
-              color: 'var(--wb-text-bright)',
-              fontSize: '11.5px',
-              padding: '3px 10px',
-              borderRadius: '5px',
-              cursor: isRunning ? 'not-allowed' : 'pointer'
-            }}
-          >
-            <Play size={11} fill="currentColor" />
-            <span>运行</span>
-            <kbd style={{ fontSize: '10px', color: 'var(--wb-text-dim)' }}>⌘↵</kbd>
-          </button>
+            <button
+              onClick={handleSaveImmediately}
+              className="wb-icon-btn"
+              title="立即将当前代码暂存到本地草稿 (快捷键 ⌘S / Ctrl+S)"
+            >
+              <Save size={12} />
+            </button>
 
-          {/* 验证评测 */}
-          <button
-            onClick={handleVerify}
-            disabled={isRunning}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              background: 'var(--wb-accent-subtle)',
-              border: 'none',
-              color: '#ffffff',
-              fontWeight: 500,
-              fontSize: '11.5px',
-              padding: '3px 10px',
-              borderRadius: '5px',
-              cursor: isRunning ? 'not-allowed' : 'pointer'
-            }}
-          >
-            <CheckCircle size={12} />
-            <span>验证通关</span>
-          </button>
+            <button
+              onClick={handleCopy}
+              className="wb-icon-btn"
+              title={copied ? "已复制到剪贴板" : "复制代码到剪贴板"}
+            >
+              {copied ? <Check size={12} color="var(--wb-accent-success)" /> : <Copy size={12} />}
+            </button>
+          </div>
+
+          {/* 细微分隔符 */}
+          <span style={{ width: '1px', height: '14px', background: 'var(--wb-border-subtle, rgba(255,255,255,0.1))', margin: '0 1px' }} />
+
+          {/* 3. 核心执行与验证区 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            {/* 运行按钮 */}
+            <button
+              onClick={handleRunCode}
+              disabled={isRunning}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: 'var(--wb-bg-subtle)',
+                border: '1px solid var(--wb-border-subtle)',
+                color: 'var(--wb-text-bright)',
+                fontSize: '11px',
+                padding: '2px 8px',
+                borderRadius: '5px',
+                cursor: isRunning ? 'not-allowed' : 'pointer'
+              }}
+              title="在沙箱中运行当前代码 (快捷键 ⌘Enter / Ctrl+Enter)"
+            >
+              <Play size={10} fill="currentColor" />
+              <span>运行</span>
+              <kbd style={{ fontSize: '9.5px', color: 'var(--wb-text-dim)' }}>⌘↵</kbd>
+            </button>
+
+            {/* 验证评测 */}
+            <button
+              onClick={handleVerify}
+              disabled={isRunning}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: 'var(--wb-accent-subtle)',
+                border: 'none',
+                color: '#ffffff',
+                fontWeight: 600,
+                fontSize: '11px',
+                padding: '2px 9px',
+                borderRadius: '5px',
+                cursor: isRunning ? 'not-allowed' : 'pointer',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+              }}
+              title="运行单元测试套件，评测通关并记录能力画像"
+            >
+              <CheckCircle size={11} />
+              <span>验证通关</span>
+            </button>
+          </div>
         </div>
       </div>
 
