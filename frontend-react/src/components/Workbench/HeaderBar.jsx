@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   CheckCircle2, Search, LayoutGrid, Code2, 
-  PanelLeft, PanelRight, Maximize2, Trophy,
+  PanelLeft, PanelRight, Maximize2, Trophy, Award,
   Building2, ShieldCheck, Zap, User, ChevronDown,
   LogOut, Palette, Check, Database, Cpu, Network,
   AlertTriangle, RotateCcw, Activity, HelpCircle, BookOpen
