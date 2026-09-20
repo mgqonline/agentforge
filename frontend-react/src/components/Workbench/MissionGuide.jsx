@@ -741,51 +741,49 @@ export default function MissionGuide({
         justifyContent: 'space-between',
         background: 'var(--wb-bg-header)'
       }}>
-        {/* Tab 切换组 */}
-        <div style={{ display: 'flex', gap: '4px' }}>
+        {/* Tab 切换组 (极简图标分段器，悬浮显示说明) */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          background: 'var(--wb-bg-subtle, rgba(255, 255, 255, 0.04))',
+          border: '1px solid var(--wb-border-subtle, rgba(255, 255, 255, 0.08))',
+          borderRadius: '6px',
+          padding: '2px',
+          gap: '2px'
+        }}>
           <button
             onClick={() => setActiveTab('mission')}
+            className="wb-icon-btn"
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              background: activeTab === 'mission' ? 'var(--wb-bg-subtle)' : 'transparent',
-              border: activeTab === 'mission' ? '1px solid var(--wb-border-subtle)' : '1px solid transparent',
-              color: activeTab === 'mission' ? 'var(--wb-text-bright)' : 'var(--wb-text-sub)',
-              padding: '4px 8px',
-              borderRadius: '5px',
-              fontSize: '11.5px',
-              fontWeight: 600,
-              cursor: 'pointer'
+              width: '28px',
+              height: '24px',
+              borderRadius: '4px',
+              background: activeTab === 'mission' ? 'var(--wb-bg-hover, rgba(255, 255, 255, 0.12))' : 'transparent',
+              color: activeTab === 'mission' ? 'var(--wb-accent-subtle, #38bdf8)' : 'var(--wb-text-sub)'
             }}
+            title="🎯 闯关实战：查看任务目标、需求规范与断言标准"
           >
-            <Target size={13} color={activeTab === 'mission' ? 'var(--wb-accent-subtle)' : 'currentColor'} />
-            <span>🎯 闯关实战</span>
+            <Target size={14} />
           </button>
 
           <button
             onClick={() => setActiveTab('doc')}
+            className="wb-icon-btn"
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              background: activeTab === 'doc' ? 'var(--wb-bg-subtle)' : 'transparent',
-              border: activeTab === 'doc' ? '1px solid var(--wb-border-subtle)' : '1px solid transparent',
-              color: activeTab === 'doc' ? 'var(--wb-text-bright)' : 'var(--wb-text-sub)',
-              padding: '4px 8px',
-              borderRadius: '5px',
-              fontSize: '11.5px',
-              fontWeight: 600,
-              cursor: 'pointer'
+              width: '28px',
+              height: '24px',
+              borderRadius: '4px',
+              background: activeTab === 'doc' ? 'var(--wb-bg-hover, rgba(255, 255, 255, 0.12))' : 'transparent',
+              color: activeTab === 'doc' ? 'var(--wb-accent-primary, #60a5fa)' : 'var(--wb-text-sub)'
             }}
+            title="📖 知识手册：阅读核心技术架构解析与参考讲义"
           >
-            <BookOpen size={13} color={activeTab === 'doc' ? 'var(--wb-accent-primary)' : 'currentColor'} />
-            <span>📖 知识手册</span>
+            <BookOpen size={14} />
           </button>
         </div>
 
-        {/* 右侧动作组 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative' }}>
+        {/* 右侧动作组 (纯图标精简，悬浮查看文案) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', position: 'relative' }}>
           {/* 在手册模式下展示放大缩小与沉浸控制 */}
           {activeTab === 'doc' && renderZoomControls(false)}
 
@@ -793,20 +791,17 @@ export default function MissionGuide({
           <div ref={exportMenuRef} style={{ position: 'relative' }}>
             <button
               onClick={() => setShowExportMenu(prev => !prev)}
-              className="wb-btn-ghost"
+              className="wb-icon-btn"
               style={{
-                fontSize: '11px',
-                padding: '2px 7px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                background: showExportMenu ? 'var(--wb-bg-hover)' : undefined
+                width: '26px',
+                height: '24px',
+                borderRadius: '4px',
+                background: showExportMenu ? 'var(--wb-bg-hover)' : 'transparent',
+                color: showExportMenu ? 'var(--wb-accent-subtle)' : 'var(--wb-text-sub)'
               }}
-              title="导出当前关卡完整实战讲义与参考代码"
+              title="导出讲义：导出完整实战 Markdown 讲义或打印 PDF"
             >
-              <Download size={12} />
-              <span>导出讲义</span>
-              <ChevronDown size={10} />
+              <Download size={13} />
             </button>
 
             {/* 导出选项下拉卡片 */}
@@ -879,20 +874,19 @@ export default function MissionGuide({
           {phaseDetail.starter_code && (
             <button
               onClick={() => onLoadStarterCode(phaseDetail.starter_code)}
-              className="wb-btn-ghost"
-              style={{ fontSize: '11px', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px' }}
-              title="载入官方闯关代码模板"
+              className="wb-icon-btn"
+              style={{ width: '26px', height: '24px', borderRadius: '4px' }}
+              title="载入模板：将官方初始起手代码重新载入到编辑器"
             >
-              <FileCode size={12} />
-              <span>载入模板</span>
+              <FileCode size={13} />
             </button>
           )}
 
           <button
             onClick={onToggleCollapse}
-            className="wb-btn-ghost"
-            style={{ padding: '4px' }}
-            title="收起侧栏专注编码"
+            className="wb-icon-btn"
+            style={{ width: '26px', height: '24px', borderRadius: '4px' }}
+            title="收起面板：收起指导书面板，进入代码全屏专注模式"
           >
             <ChevronLeft size={14} />
           </button>
