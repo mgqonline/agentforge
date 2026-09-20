@@ -231,6 +231,55 @@ export default function HeaderBar({
             </button>
           </div>
         )}
+
+        {/* 核心模式分段器 (实战台 / 概览) */}
+        <div style={{
+          display: 'flex',
+          background: 'var(--wb-bg-subtle, rgba(255, 255, 255, 0.04))',
+          padding: '2px',
+          borderRadius: '5px',
+          border: '1px solid var(--wb-border-subtle, rgba(255, 255, 255, 0.08))',
+          marginLeft: '4px'
+        }}>
+          <button
+            onClick={() => setMode('workbench')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '2px 7px',
+              fontSize: '11px',
+              borderRadius: '3px',
+              border: 'none',
+              cursor: 'pointer',
+              background: currentMode === 'workbench' ? 'var(--wb-bg-hover, rgba(255,255,255,0.12))' : 'transparent',
+              color: currentMode === 'workbench' ? 'var(--wb-text-bright, #fff)' : 'var(--wb-text-dim, #888)',
+              fontWeight: currentMode === 'workbench' ? 600 : 400
+            }}
+          >
+            <Code2 size={11} />
+            <span>实战台</span>
+          </button>
+          <button
+            onClick={() => setMode('dashboard')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '2px 7px',
+              fontSize: '11px',
+              borderRadius: '3px',
+              border: 'none',
+              cursor: 'pointer',
+              background: currentMode === 'dashboard' ? 'var(--wb-bg-hover, rgba(255,255,255,0.12))' : 'transparent',
+              color: currentMode === 'dashboard' ? 'var(--wb-text-bright, #fff)' : 'var(--wb-text-dim, #888)',
+              fontWeight: currentMode === 'dashboard' ? 600 : 400
+            }}
+          >
+            <LayoutGrid size={11} />
+            <span>概览</span>
+          </button>
+        </div>
       </div>
 
       {/* 中间快捷检索与进度 */}
@@ -288,9 +337,56 @@ export default function HeaderBar({
         </div>
       </div>
 
-      {/* 右侧：1. 租户算力胶囊  2. 沙箱与模式  3. 个人中心下拉菜单 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        {/* 1. 企业租户与算力微胶囊 (Tenant & Token Budget Capsule) */}
+      {/* 右侧：1. 快捷工具  2. 基础设施  3. 租户算力  4. 用户中心 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        {/* 1. 快捷工具组：知识库 + 新手指南 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button
+            onClick={onOpenKnowledge}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '2px 7px',
+              borderRadius: '5px',
+              border: '1px solid rgba(59, 130, 246, 0.2)',
+              background: 'rgba(59, 130, 246, 0.06)',
+              color: '#60a5fa',
+              fontSize: '11px',
+              fontWeight: 500,
+              cursor: 'pointer'
+            }}
+            title="打开企业私有知识库 (RAG & 文档解析)"
+          >
+            <Database size={11} />
+            <span>知识库</span>
+          </button>
+
+          <button
+            onClick={onOpenOnboarding}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '2px 7px',
+              borderRadius: '5px',
+              border: '1px solid rgba(245, 158, 11, 0.25)',
+              background: 'rgba(245, 158, 11, 0.08)',
+              color: '#fbbf24',
+              fontSize: '11px',
+              fontWeight: 500,
+              cursor: 'pointer'
+            }}
+            title="查看新手操作手册与通关指引"
+          >
+            <HelpCircle size={11} />
+            <span>指南</span>
+          </button>
+        </div>
+
+        <span style={{ width: '1px', height: '14px', background: 'var(--wb-border-subtle, rgba(255,255,255,0.1))', margin: '0 2px' }} />
+
+        {/* 2. 企业租户与算力微胶囊 (Tenant & Token Budget Capsule) */}
         {currentTenant && (() => {
           const consumed = currentTenant.tokens_consumed || 0;
           const budget = currentTenant.monthly_token_budget || 1;
@@ -308,10 +404,10 @@ export default function HeaderBar({
                   ? '1px solid rgba(239, 68, 68, 0.6)' 
                   : isWarning80 
                   ? '1px solid rgba(245, 158, 11, 0.6)' 
-                  : '1px solid var(--wb-border-subtle, rgba(255, 255, 255, 0.1))',
-                borderRadius: '6px',
-                padding: '2px 8px',
-                gap: '8px',
+                  : '1px solid var(--wb-border-subtle, rgba(255, 255, 255, 0.08))',
+                borderRadius: '5px',
+                padding: '2px 7px',
+                gap: '6px',
                 fontSize: '11px',
                 boxShadow: isWarning80 
                   ? '0 0 8px rgba(245, 158, 11, 0.25)' 
@@ -323,17 +419,17 @@ export default function HeaderBar({
                   style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
-                    gap: '4px',
+                    gap: '3px',
                     cursor: 'pointer',
                     color: 'var(--wb-text-bright, #fff)'
                   }}
-                  title="点击切换组织/租户算力池"
+                  title={`当前生效租户: ${currentTenant.tenant_name} (点击切换)`}
                 >
-                  <Building2 size={12} color="var(--wb-accent-primary, #3b82f6)" />
-                  <span style={{ fontWeight: 600, maxWidth: '130px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {currentTenant.tenant_name?.split(' ')[0] || '企业核心智算中心'}
+                  <Building2 size={11} color="var(--wb-accent-primary, #3b82f6)" />
+                  <span style={{ fontWeight: 600, maxWidth: '82px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {currentTenant.tenant_name?.split(' ')[0] || '企业智算'}
                   </span>
-                  <ChevronDown size={11} color="var(--wb-text-dim, #888)" />
+                  <ChevronDown size={10} color="var(--wb-text-dim, #888)" />
                 </div>
 
                 {/* 分隔线 */}
@@ -573,158 +669,40 @@ export default function HeaderBar({
           );
         })()}
 
-        {/* 2. 沙箱指示点与视图切换 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* 沙箱状态 */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '4px', 
-            fontSize: '11px', 
-            color: sandboxReady ? 'var(--wb-accent-success, #22c55e)' : 'var(--wb-accent-rose, #f43f5e)' 
-          }}
-          title={sandboxReady ? '代码执行沙箱正常就绪' : '沙箱离线'}
-          >
-            <span style={{
-              width: '6px',
-              height: '6px',
-              borderRadius: '50%',
-              background: sandboxReady ? 'var(--wb-accent-success, #22c55e)' : 'var(--wb-accent-rose, #f43f5e)'
-            }} />
-            <span style={{ color: 'var(--wb-text-dim, #888)' }}>沙箱</span>
-          </div>
+        <span style={{ width: '1px', height: '14px', background: 'var(--wb-border-subtle, rgba(255,255,255,0.1))', margin: '0 2px' }} />
 
-          {/* 模式分段器 */}
-          <div style={{
-            display: 'flex',
-            background: 'var(--wb-bg-subtle, rgba(255, 255, 255, 0.04))',
-            padding: '2px',
-            borderRadius: '5px',
-            border: '1px solid var(--wb-border-subtle, rgba(255, 255, 255, 0.1))'
-          }}>
-            <button
-              onClick={() => setMode('workbench')}
+        {/* 3. 基础设施健康胶囊 (整合模型集群与沙箱状态) */}
+        {modelCluster && (
+          <div ref={modelMenuRef} style={{ position: 'relative' }}>
+            <div
+              onClick={() => setIsModelMenuOpen(!isModelMenuOpen)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
+                gap: '5px',
                 padding: '2px 7px',
+                borderRadius: '5px',
+                border: '1px solid var(--wb-border-subtle, rgba(255, 255, 255, 0.08))',
+                background: 'var(--wb-bg-subtle, rgba(255, 255, 255, 0.03))',
+                color: (sandboxReady && modelCluster.cluster_health === 'healthy') ? '#4ade80' : '#f59e0b',
                 fontSize: '11px',
-                borderRadius: '4px',
-                border: 'none',
-                cursor: 'pointer',
-                background: currentMode === 'workbench' ? 'var(--wb-bg-hover, rgba(255,255,255,0.1))' : 'transparent',
-                color: currentMode === 'workbench' ? 'var(--wb-text-bright, #fff)' : 'var(--wb-text-dim, #888)'
+                cursor: 'pointer'
               }}
+              title="点击查看 AI 模型集群与沙箱容器状态"
             >
-              <Code2 size={11} />
-              <span>实战台</span>
-            </button>
-            <button
-              onClick={() => setMode('dashboard')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '2px 7px',
-                fontSize: '11px',
-                borderRadius: '4px',
-                border: 'none',
-                cursor: 'pointer',
-                background: currentMode === 'dashboard' ? 'var(--wb-bg-hover, rgba(255,255,255,0.1))' : 'transparent',
-                color: currentMode === 'dashboard' ? 'var(--wb-text-bright, #fff)' : 'var(--wb-text-dim, #888)'
-              }}
-            >
-              <LayoutGrid size={11} />
-              <span>概览</span>
-            </button>
-          </div>
+              <span style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: (sandboxReady && modelCluster.cluster_health === 'healthy') ? '#22c55e' : '#f59e0b',
+                boxShadow: (sandboxReady && modelCluster.cluster_health === 'healthy') ? '0 0 6px #22c55e' : 'none'
+              }} />
+              <Cpu size={11} color="var(--wb-text-dim, #888)" />
+              <span style={{ color: 'var(--wb-text-bright, #fff)', fontWeight: 500 }}>
+                {modelCluster.nodes?.[0]?.name?.split(' ')[0] || 'DeepSeek'}
+              </span>
+            </div>
 
-          {/* 知识库入口 */}
-          <button
-            onClick={onOpenKnowledge}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              padding: '3px 9px',
-              borderRadius: '5px',
-              border: '1px solid rgba(59, 130, 246, 0.25)',
-              background: 'rgba(59, 130, 246, 0.08)',
-              color: '#60a5fa',
-              fontSize: '11.5px',
-              fontWeight: 500,
-              cursor: 'pointer'
-            }}
-            title="打开企业私有知识库 (RAG & 文档解析)"
-          >
-            <Database size={12} />
-            <span>知识库</span>
-          </button>
-
-          {/* 新手操作手册入口 */}
-          <button
-            onClick={onOpenOnboarding}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              padding: '3px 9px',
-              borderRadius: '5px',
-              border: '1px solid rgba(245, 158, 11, 0.35)',
-              background: 'rgba(245, 158, 11, 0.09)',
-              color: '#fbbf24',
-              fontSize: '11.5px',
-              fontWeight: 500,
-              cursor: 'pointer'
-            }}
-            title="查看新手操作手册与通关指引"
-          >
-            <HelpCircle size={12} />
-            <span>新手指南</span>
-          </button>
-
-          {/* 高可用模型集群状态指示微胶囊 (Circuit Breaker Indicator) */}
-          {modelCluster && (
-            <div ref={modelMenuRef} style={{ position: 'relative' }}>
-              <div
-                onClick={() => setIsModelMenuOpen(!isModelMenuOpen)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  padding: '3px 8px',
-                  borderRadius: '5px',
-                  border: '1px solid var(--wb-border-subtle, rgba(255, 255, 255, 0.1))',
-                  background: 'var(--wb-bg-subtle, rgba(255, 255, 255, 0.04))',
-                  color: modelCluster.cluster_health === 'healthy' ? '#4ade80' : '#f59e0b',
-                  fontSize: '11px',
-                  cursor: 'pointer'
-                }}
-                title="点击查看大模型高可用多路熔断路由状态"
-              >
-                <span style={{
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  background: modelCluster.cluster_health === 'healthy' ? '#22c55e' : '#f59e0b',
-                  boxShadow: modelCluster.cluster_health === 'healthy' ? '0 0 6px #22c55e' : 'none'
-                }} />
-                <Cpu size={11} />
-                <span style={{ color: 'var(--wb-text-bright, #fff)', fontWeight: 500 }}>
-                  {modelCluster.nodes?.[0]?.name?.split(' ')[0] || 'DeepSeek'}
-                </span>
-                <span style={{
-                  fontSize: '9.5px',
-                  padding: '0 4px',
-                  borderRadius: '3px',
-                  background: modelCluster.cluster_health === 'healthy' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                  color: modelCluster.cluster_health === 'healthy' ? '#4ade80' : '#f59e0b',
-                  fontFamily: 'monospace'
-                }}>
-                  {modelCluster.nodes?.[0]?.state || 'CLOSED'}
-                </span>
-              </div>
 
               {/* 模型路由节点下拉卡片 */}
               {isModelMenuOpen && (
@@ -756,6 +734,26 @@ export default function HeaderBar({
                       color: modelCluster.cluster_health === 'healthy' ? '#4ade80' : '#f59e0b'
                     }}>
                       集群: {modelCluster.cluster_health.toUpperCase()}
+                    </span>
+                  </div>
+
+                  {/* 沙箱隔离执行状态指示 */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '5px 8px',
+                    borderRadius: '6px',
+                    background: sandboxReady ? 'rgba(34, 197, 94, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+                    border: `1px solid ${sandboxReady ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+                    fontSize: '11px'
+                  }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--wb-text-bright, #fff)', fontWeight: 500 }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: sandboxReady ? '#22c55e' : '#ef4444' }} />
+                      <span>Docker 代码安全沙箱</span>
+                    </span>
+                    <span style={{ color: sandboxReady ? '#4ade80' : '#f87171', fontWeight: 600, fontSize: '10.5px' }}>
+                      {sandboxReady ? '● 隔离就绪 (30s)' : '● 离线异常'}
                     </span>
                   </div>
 
@@ -870,9 +868,10 @@ export default function HeaderBar({
               )}
             </div>
           )}
-        </div>
 
-        {/* 3. 用户个人中心下拉菜单 (收敛治理、报告、主题与退出) */}
+        <span style={{ width: '1px', height: '14px', background: 'var(--wb-border-subtle, rgba(255,255,255,0.1))', margin: '0 2px' }} />
+
+        {/* 4. 用户个人中心下拉菜单 (收敛治理、报告、主题与退出) */}
         <div style={{ position: 'relative' }} ref={userMenuRef}>
           <button
             onClick={() => setIsUserMenuOpen(prev => !prev)}
@@ -891,9 +890,12 @@ export default function HeaderBar({
               boxShadow: '0 1px 2px rgba(0,0,0,0.15)'
             }}
           >
-            <User size={12} />
-            <span>{currentUser?.role === 'admin' ? '👑 超管' : currentUser?.role === 'developer' ? '🛠️ 研发' : '👁️ 访客'}: {currentUser?.username || 'admin'}</span>
-            <ChevronDown size={11} style={{ transform: isUserMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+            <User size={11} />
+            <span style={{ maxWidth: '85px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {currentUser?.role === 'admin' ? '👑 ' : currentUser?.role === 'developer' ? '🛠️ ' : '👁️ '}
+              {currentUser?.username || 'admin'}
+            </span>
+            <ChevronDown size={10} style={{ transform: isUserMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
           </button>
 
           {/* 下拉浮层卡片 */}
