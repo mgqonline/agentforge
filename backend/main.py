@@ -622,6 +622,7 @@ async def websocket_chat(websocket: WebSocket, session_id: str = "anonymous", us
 from curriculum_engine import CurriculumEngine
 from sandbox_runner import SandboxRunner
 from dfl_engine import dfl_feedback
+from socratic_guard import socratic_guard
 
 PROJECT_ROOT = "/app/curriculum" if os.path.exists("/app/curriculum") else os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 curriculum_engine = CurriculumEngine(base_dir=PROJECT_ROOT)
@@ -1217,6 +1218,77 @@ async def api_sandbox_verify(
             }
         )
 
+    # 5. 掌握度闭环：每次提交都沉淀过程证据，并由证据推导评分
+    # 这替代了此前「写死的 score=68/88」——评分现在随尝试次数、首试表现、
+    # 耗时与求助量连续变化，教师可据此识别真正需要帮助的学员。
+    mastery_payload = None
+    try:
+        from mastery_engine import (
+            MasteryEvidence, evaluate_mastery, classify_failure,
+            extract_concepts, failure_kind_label,
+        )
+        from auth_governance import (
+            record_attempt, get_mastery_evidence, save_mastery_result,
+            update_learner_mastery,
+        )
+
+        error_text = result.get("error") or ""
+        output_text = result.get("output") or ""
+        failure_kind = "" if result.get("passed") else classify_failure(f"{error_text}\n{output_text}")
+        duration_ms = int(result.get("execution_time_ms", 0) or 0)
+
+        # 5.1 记录本次尝试（成功与失败都记，这是与旧实现的关键差异）
+        record_attempt(
+            user_id=user_id,
+            username=username,
+            tenant_id=ctx.tenant_id,
+            phase_id=req.phase_id,
+            passed=bool(result.get("passed")),
+            duration_ms=duration_ms,
+            failure_kind=failure_kind,
+            detail={"phase_title": (detail or {}).get("title", "")},
+        )
+
+        # 5.2 读取累计证据并推导掌握度评分
+        evidence = get_mastery_evidence(user_id, req.phase_id)
+        mastery = evaluate_mastery(MasteryEvidence(
+            attempts_total=evidence["attemptsTotal"],
+            attempts_failed=evidence["attemptsFailed"],
+            first_attempt_passed=evidence["firstAttemptPassed"],
+            time_spent_ms=evidence["timeSpentMs"],
+            hints_used=evidence["hintsUsed"],
+            passed=evidence["passed"],
+            difficulty=(detail or {}).get("difficulty", ""),
+            failure_kinds=[k for k in [evidence.get("lastFailureKind"), failure_kind] if k],
+        ))
+
+        if result.get("passed"):
+            save_mastery_result(user_id, req.phase_id, mastery.score, mastery.level)
+
+        # 5.3 更新跨会话概念级画像（长期记忆）
+        concepts = extract_concepts(
+            req.phase_id,
+            (detail or {}).get("title", ""),
+            (detail or {}).get("tags") or [],
+        )
+        for concept in concepts:
+            update_learner_mastery(user_id, concept, req.phase_id, failed=not result.get("passed"))
+
+        mastery_payload = {
+            **mastery.as_dict(),
+            "attemptsTotal": evidence["attemptsTotal"],
+            "attemptsFailed": evidence["attemptsFailed"],
+            "firstAttemptPassed": evidence["firstAttemptPassed"],
+            "timeSpentMs": evidence["timeSpentMs"],
+            "hintsUsed": evidence["hintsUsed"],
+            "failureKind": failure_kind,
+            "failureLabel": failure_kind_label(failure_kind) if failure_kind else "",
+        }
+        result["mastery"] = mastery_payload
+    except Exception as exc:
+        # 掌握度属于增强能力，失败不应阻断评测主流程；但在响应中明确暴露，避免静默
+        result["mastery"] = {"error": f"掌握度评估未完成: {exc}"}
+
     result["tenant_quota"] = quota
     result["tenant_id"] = ctx.tenant_id
     result["tenant_name"] = tenant_info.tenant_name if tenant_info else ctx.tenant_id
@@ -1268,8 +1340,20 @@ async def api_sync_user_progress(
 
 
 @app.post("/api/v1/mentor/review")
-async def api_mentor_review(req: MentorReviewRequest):
+async def api_mentor_review(
+    req: MentorReviewRequest,
+    authorization: Optional[str] = Header(None),
+    x_tenant_id: Optional[str] = Header(None)
+):
     """结合 DFL 决策分析与 DeepSeek 大模型给出全方位企业级伴学诊断"""
+    # 0. 解析学员身份，用于注入跨会话学习档案（导师记忆）
+    try:
+        _ctx = resolve_tenant_context(authorization, x_tenant_id)
+        _user_id = getattr(_ctx, "user_id", "")
+    except Exception:
+        _user_id = ""
+    learner_profile = _build_learner_profile_brief(_user_id, req.phase_id)
+
     # 1. 使用 DFL 决策层先验分析用户意图及上下文
     user_query = (req.question or "").strip()
     context_desc = f"关卡: {req.phase_id}"
@@ -1332,7 +1416,7 @@ async def api_mentor_review(req: MentorReviewRequest):
 
 ## 学员提问诉求
 {user_query if user_query else "请帮我分析报错根因，给出启发式排障思路，不要直接给我完整答案。"}
-
+{learner_profile}
 ---
 ## 请严格按照以下四大启发式维度输出清晰的 Markdown 格式：
 
@@ -1374,7 +1458,7 @@ async def api_mentor_review(req: MentorReviewRequest):
 
 ## 学员具体疑问
 {user_query if user_query else "请对当前代码进行多维度深度 Code Review，指出架构盲点并给出生产级优化重构建议。"}
-
+{learner_profile}
 ---
 ## 请严格按照以下五大结构化维度使用清晰的 Markdown 格式输出：
 ### 1. 📊 代码健康度与架构评分 (给出评分 XX/100 及评级 S/A/B/C)
@@ -1394,6 +1478,19 @@ async def api_mentor_review(req: MentorReviewRequest):
                 temperature=0.3
             )
             review_markdown = resp.choices[0].message.content
+
+            # 苏格拉底护栏：在返回给学员之前做硬校验。
+            # 仅靠 system prompt 的「严禁给出完整答案」是软约束，模型在长对话或
+            # 强诱导下容易破防贴出可复制过关的答案。这里对输出做二次拦截。
+            review_markdown, guard_report = socratic_guard.enforce(
+                review_markdown, is_troubleshooting=is_error_diagnostic
+            )
+            if not guard_report["passed"]:
+                # 命中拦截时在文末追加一行温和说明，避免学员以为答案被吞了
+                review_markdown += (
+                    "\n\n---\n> 🧭 本次回复中如有可直接复制的完整实现，已被教学策略替换为思考线索。"
+                    "先自己写一版再对照报错，学习效果会好得多。\n"
+                )
 
             # 提取评分
             import re
@@ -1436,8 +1533,19 @@ async def api_mentor_review(req: MentorReviewRequest):
     }
 
 @app.post("/api/v1/mentor/review/stream")
-async def api_mentor_review_stream(req: MentorReviewRequest):
+async def api_mentor_review_stream(
+    req: MentorReviewRequest,
+    authorization: Optional[str] = Header(None),
+    x_tenant_id: Optional[str] = Header(None)
+):
     """支持 SSE 流式打字机输出的高性能 AI 伴学排障接口，具备多模态与堆栈精确定位"""
+    try:
+        _ctx = resolve_tenant_context(authorization, x_tenant_id)
+        _user_id = getattr(_ctx, "user_id", "")
+    except Exception:
+        _user_id = ""
+    learner_profile = _build_learner_profile_brief(_user_id, req.phase_id)
+
     user_query = (req.question or "").strip()
     context_desc = f"关卡: {req.phase_id}"
     intent_prompt = user_query if user_query else f"深度诊断代码质量与执行状态: {req.error_output[:120]}"
@@ -1502,7 +1610,7 @@ async def api_mentor_review_stream(req: MentorReviewRequest):
 
 ## 学员提问诉求
 {user_query if user_query else "请帮我分析报错根因，给出启发式排障思路，不要直接给我完整答案。"}
-
+{learner_profile}
 ---
 请按四大维度输出 Markdown：
 ### 1. 💡 报错根因通俗解读
@@ -1531,7 +1639,7 @@ async def api_mentor_review_stream(req: MentorReviewRequest):
 
 ## 学员疑问
 {user_query if user_query else "请对当前代码进行多维度深度 Code Review，指出架构盲点并给出生产级优化重构建议。"}
-
+{learner_profile}
 ---
 请按五大维度输出 Markdown：
 ### 1. 📊 代码健康度与架构评分 (给出评分 XX/100 及评级 S/A/B/C)
@@ -1553,6 +1661,42 @@ async def api_mentor_review_stream(req: MentorReviewRequest):
             "dfl_decision": decision
         }
         yield f"data: {json.dumps(init_meta, ensure_ascii=False)}\n\n"
+
+        # 苏格拉底护栏的流式适配：
+        # 完整答案往往是「跨多个 delta 拼出来」的代码块，逐 delta 直吐就没法在
+        # 吐字之前判断它是不是泄题。因此这里按行缓冲：只有在确认缓冲内容已经脱离
+        # 未闭合的 ``` 代码块之后，才整段过一遍护栏再流式发出。
+        pending = ""          # 尚未安全放行的缓冲文本
+
+        def _guard_safe_chunk(chunk_text: str) -> str:
+            """对流式片段执行护栏；命中拦截时返回替换后的文本。"""
+            guarded, rep = socratic_guard.enforce(chunk_text, is_troubleshooting=is_error_diagnostic)
+            if not rep["passed"]:
+                # 流式场景下追加一行细体提示，让学员知道内容被有意收敛了
+                guarded += "\n> 🧭 *（本次回复中的完整实现已被教学策略替换为思考线索）*\n"
+            return guarded
+
+        def _flush_safe(force: bool = False):
+            """
+            按行缓冲的护栏放行器。
+
+            关键顺序：每次都要**先用整段缓冲重新计算围栏开闭状态**，再决定能否放行。
+            早前版本先判 `inside_fence` 再更新状态，导致代码块起始行（```）被当作
+            普通文本立即吐给前端，护栏随后就再也看不到完整代码块，泄题拦不住。
+
+            force=True 用于流式收尾，忽略代码块是否闭合，避免末尾内容被吞。
+            """
+            nonlocal pending
+            if not pending:
+                return
+            # 用整段缓冲重算围栏状态：跨 delta 拆开的 ``` 也能被正确识别
+            fence_open = pending.count("```") % 2 == 1
+            if fence_open and not force:
+                return  # 代码块还没闭合，继续攒着，不让半截内容提前泄漏
+            text = _guard_safe_chunk(pending)
+            pending = ""
+            for line in text.splitlines(keepends=True):
+                yield f"data: {json.dumps({'type': 'token', 'token': line}, ensure_ascii=False)}\n\n"
 
         if api_key:
             try:
@@ -1586,23 +1730,32 @@ async def api_mentor_review_stream(req: MentorReviewRequest):
                 )
                 async for chunk in stream:
                     delta = chunk.choices[0].delta.content if chunk.choices and chunk.choices[0].delta else ""
-                    if delta:
-                        chunk_data = {"type": "token", "token": delta}
-                        yield f"data: {json.dumps(chunk_data, ensure_ascii=False)}\n\n"
+                    if not delta:
+                        continue
+                    # 先把 delta 完整并入缓冲区，再按「整行」判断能否放行
+                    pending += delta
+                    if "\n" not in pending:
+                        continue
+                    for payload in _flush_safe():
+                        yield payload
+
+                # 收尾：把缓冲区里剩余的内容（含未闭合代码块）也过一遍护栏
+                for payload in _flush_safe(force=True):
+                    yield payload
             except Exception as e:
                 # 异常时退化为本地离线诊断，按自然打字机节奏逐段流式吐出
                 err_notice = f"\n\n> ⚠️ *外部推理接口暂时波动 (`{str(e)}`)，已自动降级为本地启发式诊断内核：*\n\n"
                 msg_json = json.dumps({"type": "token", "token": err_notice}, ensure_ascii=False)
                 yield f"data: {msg_json}\n\n"
                 offline_text = _generate_offline_diagnostic(req.phase_id, phase_title, req.user_code, error_text)
-                for line in offline_text.split("\n"):
+                for line in _guard_safe_chunk(offline_text).split("\n"):
                     line_chunk = json.dumps({"type": "token", "token": line + "\n"}, ensure_ascii=False)
                     yield f"data: {line_chunk}\n\n"
                     await asyncio.sleep(0.02)
         else:
             # 纯离线模式：模拟平滑打字机吐字
             offline_text = f"### 💡 本地启发式诊断引擎 (离线模式)\n未检测到全局 `OPENAI_API_KEY`，系统已启用内置启发式排障内核：\n\n" + _generate_offline_diagnostic(req.phase_id, phase_title, req.user_code, error_text)
-            for line in offline_text.split("\n"):
+            for line in _guard_safe_chunk(offline_text).split("\n"):
                 line_chunk = json.dumps({"type": "token", "token": line + "\n"}, ensure_ascii=False)
                 yield f"data: {line_chunk}\n\n"
                 await asyncio.sleep(0.015)
@@ -1618,6 +1771,52 @@ async def api_mentor_review_stream(req: MentorReviewRequest):
             "X-Accel-Buffering": "no"
         }
     )
+
+def _build_learner_profile_brief(user_id: str, phase_id: str) -> str:
+    """构造注入导师 Prompt 的学员画像摘要。
+
+    这是「导师有记忆」的落点：把该学员在本关卡的尝试证据与跨会话概念画像
+    转成一段人话描述，让导师知道学员已经失败过几次、卡在什么类型的错误上、
+    哪些概念反复出错，从而调整提问的深度与方向，而不是每轮都从零开始。
+    """
+    if not user_id:
+        return ""
+    try:
+        from auth_governance import get_mastery_evidence, get_learner_profile
+
+        ev = get_mastery_evidence(user_id, phase_id)
+        lines: List[str] = []
+
+        if ev["attemptsTotal"] > 0:
+            status = "已通关" if ev["passed"] else "尚未通关"
+            lines.append(
+                f"- 本关卡提交 {ev['attemptsTotal']} 次（失败 {ev['attemptsFailed']} 次），当前状态：{status}。"
+            )
+            if ev["firstAttemptPassed"]:
+                lines.append("- 首次提交即通过，说明该关卡概念已较好掌握。")
+            elif ev["attemptsFailed"] >= 3:
+                lines.append("- 已连续多次失败，属于高挫败风险，请优先稳定情绪并拆小问题。")
+            if ev["lastFailureKind"]:
+                from mastery_engine import failure_kind_label
+                lines.append(f"- 最近一次失败类型：{failure_kind_label(ev['lastFailureKind'])}。")
+            if ev["hintsUsed"]:
+                lines.append(f"- 已使用 AI 伴学诊断 {ev['hintsUsed']} 次。")
+
+        # 跨会话概念画像：只挑最薄弱的几个概念，避免 Prompt 过长
+        profile = get_learner_profile(user_id, weakest_limit=3)
+        for c in profile.get("weakest", []):
+            lines.append(
+                f"- 概念「{c['concept']}」历史掌握度约 {round(c.get('mastery', 0))}/100"
+                f"（遭遇 {c.get('encounters', 0)} 次，失败 {c.get('failures', 0)} 次），属薄弱环节。"
+            )
+
+        if not lines:
+            return ""
+        return "\n## 学员画像（跨会话学习档案，请在提问与点评中充分利用）\n" + "\n".join(lines) + "\n"
+    except Exception:
+        # 画像属于增强信息，读取失败不应阻断导师答疑主流程
+        return ""
+
 
 def _generate_offline_diagnostic(phase_id: str, phase_title: str, user_code: str, error_text: str) -> str:
     """在无网络或无 API Key 场景下，基于 AST 模式和错误堆栈生成高质量本地排障启发"""

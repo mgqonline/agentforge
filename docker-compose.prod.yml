@@ -112,8 +112,8 @@ services:
   # 5. 前端 React 沉浸式 Web 终端工作台
   frontend:
     build:
-      context: ./frontend-react
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend-react/Dockerfile
     container_name: agentforge_frontend
     restart: always
     ports:

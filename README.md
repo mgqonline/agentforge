@@ -132,12 +132,12 @@ python main.py
 **终端 2：启动交互前端 (Vite + React)**
 ```bash
 # 进入前端目录
-cd frontend
+cd frontend-react
 npm install
 
-# 启动 Web 服务
+# 启动 React Web 工作台
 npm run dev
-# 成功标志：访问 http://localhost:5173/，右上角显示“已连接至麓谷 AI 节点”
+# 成功标志：访问 http://localhost:6000/，右上角显示“已连接至麓谷 AI 节点”
 ```
 
 ---

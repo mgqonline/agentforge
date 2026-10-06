@@ -4,7 +4,9 @@ import os
 import json
 
 async def main():
-    db_url = os.getenv("ASYNC_DATABASE_URL", "postgresql://aiuser:aipassword@localhost:5432/ailearning")
+    db_url = os.getenv("ASYNC_DATABASE_URL") or os.getenv("DATABASE_URL")
+    if not db_url:
+        raise RuntimeError("ASYNC_DATABASE_URL or DATABASE_URL must be configured")
     try:
         conn = await asyncpg.connect(db_url)
         roles = json.dumps(["admin", "operator", "approver"])

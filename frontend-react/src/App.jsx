@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ChevronDown } from 'lucide-react';
 import HeaderBar from './components/Workbench/HeaderBar';
 import CurriculumNav from './components/Workbench/CurriculumNav';
 import MissionGuide from './components/Workbench/MissionGuide';
@@ -132,7 +133,6 @@ export default function App() {
 
   // 面板折叠状态控制 (极大减轻视觉疲劳，让出大屏呼吸感)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [guideCollapsed, setGuideCollapsed] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isCertificateOpen, setIsCertificateOpen] = useState(false);
@@ -452,14 +452,62 @@ export default function App() {
     } catch {}
   };
 
+  // 左侧抽屉：宽度状态（本次会话内有效，不持久化）
+  const [drawerWidth, setDrawerWidth] = useState(320);
+  const [isResizingDrawer, setIsResizingDrawer] = useState(false);
+
+  // 抽屉内两个区块的展开状态：手风琴模式——指导书默认展开，关卡列表默认收起
+  const [isGuideSectionOpen, setIsGuideSectionOpen] = useState(true);
+  const [isPhaseListSectionOpen, setIsPhaseListSectionOpen] = useState(false);
+
+  // 顶部两个按钮映射为「切到对应区块」：点哪个就展开哪个，并保证抽屉打开
+  const handleShowGuideSection = () => {
+    setSidebarCollapsed(false);
+    setIsGuideSectionOpen(true);
+    setIsPhaseListSectionOpen(false);
+    if (drawerWidth < 280) setDrawerWidth(320);
+  };
+
+  const handleShowPhaseListSection = () => {
+    setSidebarCollapsed(false);
+    setIsPhaseListSectionOpen(true);
+    setIsGuideSectionOpen(false);
+    if (drawerWidth < 280) setDrawerWidth(320);
+  };
+
+  // 手动左右拖拽调整抽屉宽度（范围 260 ~ 720，且不超过视口 70%）
+  const handleDrawerResizeStart = (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = drawerWidth;
+    const maxWidth = Math.min(720, Math.round(window.innerWidth * 0.7));
+
+    const onMove = (ev) => {
+      const delta = ev.clientX - startX;
+      setDrawerWidth(Math.max(260, Math.min(maxWidth, startWidth + delta)));
+    };
+    const onUp = () => {
+      setIsResizingDrawer(false);
+      document.body.classList.remove('wb-resizing');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+
+    setIsResizingDrawer(true);
+    document.body.classList.add('wb-resizing');
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
+  // 双击手柄恢复默认宽度
+  const handleDrawerResizeReset = () => setDrawerWidth(320);
+
   // 一键切换 Zen 模式 (全屏纯代码专注)
   const handleToggleZen = () => {
-    if (sidebarCollapsed && guideCollapsed) {
+    if (sidebarCollapsed) {
       setSidebarCollapsed(false);
-      setGuideCollapsed(false);
     } else {
       setSidebarCollapsed(true);
-      setGuideCollapsed(true);
     }
   };
 
@@ -484,7 +532,6 @@ export default function App() {
         sandboxReady={sandboxReady}
         currentMode={currentMode}
         sidebarCollapsed={sidebarCollapsed}
-        guideCollapsed={guideCollapsed}
         currentTheme={currentTheme}
         currentTenant={currentTenant}
         currentUser={currentUser}
@@ -496,8 +543,8 @@ export default function App() {
         onOpenLogin={() => setIsLoginOpen(true)}
         onLogout={handleLogout}
         onSelectTheme={applyTheme}
-        onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
-        onToggleGuide={() => setGuideCollapsed(!guideCollapsed)}
+        onToggleSidebar={handleShowPhaseListSection}
+        onToggleGuide={handleShowGuideSection}
         onToggleZen={handleToggleZen}
         setMode={setCurrentMode}
         onOpenSearch={() => setIsSearchOpen(true)}
@@ -509,34 +556,117 @@ export default function App() {
       {/* 工作台与概览切换 */}
       {currentMode === 'workbench' ? (
         <div className="wb-body">
-          {/* 左栏：轻量关卡路线列表 (支持折叠与前置锁定) */}
-          <CurriculumNav
-            phases={phases}
-            activePhaseId={activePhaseId}
-            completedPhases={completedPhases}
-            isChallengeMode={isChallengeMode}
-            isCollapsed={sidebarCollapsed}
-            isPhaseUnlocked={isPhaseUnlocked}
-            onToggleCollapse={() => setSidebarCollapsed(true)}
-            onToggleChallengeMode={handleToggleChallengeMode}
-            onSelectPhase={(id) => setActivePhaseId(id)}
-          />
+          {/* 左侧抽屉：关卡列表与指导书上下堆叠，交替展开，宽度可拖拽调节 */}
+          <aside
+            className={`wb-drawer ${sidebarCollapsed ? 'collapsed' : ''}`}
+            style={{ width: `${sidebarCollapsed ? 0 : drawerWidth}px`, minWidth: `${sidebarCollapsed ? 0 : drawerWidth}px` }}
+          >
+            {/* 区块一：关卡列表（点击标题行展开/收起） */}
+            <div
+              className="wb-drawer-handle"
+              onClick={() => setIsPhaseListSectionOpen(prev => !prev)}
+              title={isPhaseListSectionOpen ? '收起关卡列表' : '展开关卡列表'}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                <ChevronDown
+                  size={13}
+                  style={{
+                    transform: isPhaseListSectionOpen ? 'none' : 'rotate(-90deg)',
+                    transition: 'transform 0.18s ease',
+                    flexShrink: 0
+                  }}
+                />
+                <span style={{
+                  fontWeight: 600,
+                  color: isPhaseListSectionOpen ? 'var(--wb-text-bright)' : 'var(--wb-text-sub)',
+                  whiteSpace: 'nowrap'
+                }}>
+                  关卡列表
+                </span>
+              </div>
+              <span className="wb-drawer-count">
+                {completedCount}/{phases.length}
+              </span>
+            </div>
+            <div className={`wb-drawer-body ${isPhaseListSectionOpen ? '' : 'collapsed'}`}>
+              <CurriculumNav
+                phases={phases}
+                activePhaseId={activePhaseId}
+                completedPhases={completedPhases}
+                isChallengeMode={isChallengeMode}
+                isCollapsed={false}
+                showHandle={false}
+                isPhaseUnlocked={isPhaseUnlocked}
+                onToggleCollapse={() => setIsPhaseListSectionOpen(false)}
+                onToggleChallengeMode={handleToggleChallengeMode}
+                onSelectPhase={(id) => setActivePhaseId(id)}
+              />
+            </div>
 
-          {/* 中栏：实验指南 (支持折叠) */}
-          <MissionGuide
-            phaseDetail={phaseDetail}
-            activePhaseTitle={currentPhaseObj?.title || ''}
-            isCollapsed={guideCollapsed}
-            codeFiles={phaseDetail?.code_files || []}
-            activeCodeFile={activeCodeFile}
-            onSelectCodeFile={setActiveCodeFile}
-            onToggleCollapse={() => setGuideCollapsed(true)}
-            onLoadStarterCode={(code) => {
-              if (phaseDetail) {
-                setPhaseDetail({ ...phaseDetail, starter_code: code });
-              }
-            }}
-          />
+            {/* 区块二：指导书（与上方关卡列表同宽，共享整条抽屉的纵向空间） */}
+            <div
+              className="wb-drawer-handle"
+              style={{ borderTop: '1px solid var(--wb-border-subtle)' }}
+              onClick={() => setIsGuideSectionOpen(prev => !prev)}
+              title={isGuideSectionOpen ? '收起指导书' : '展开指导书'}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                <ChevronDown
+                  size={13}
+                  style={{
+                    transform: isGuideSectionOpen ? 'none' : 'rotate(-90deg)',
+                    transition: 'transform 0.18s ease',
+                    flexShrink: 0
+                  }}
+                />
+                <span style={{
+                  fontWeight: 600,
+                  color: isGuideSectionOpen ? 'var(--wb-text-bright)' : 'var(--wb-text-sub)',
+                  whiteSpace: 'nowrap'
+                }}>
+                  指导书
+                </span>
+                {currentPhaseObj && (
+                  <span style={{
+                    fontSize: '10.5px',
+                    color: 'var(--wb-text-dim)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    · 第{String(currentPhaseObj.order).padStart(2, '0')}关 {currentPhaseObj.title}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className={`wb-drawer-body ${isGuideSectionOpen ? '' : 'collapsed'}`}>
+              <MissionGuide
+                phaseDetail={phaseDetail}
+                activePhaseTitle={currentPhaseObj?.title || ''}
+                isCollapsed={false}
+                showHandle={false}
+                codeFiles={phaseDetail?.code_files || []}
+                activeCodeFile={activeCodeFile}
+                onSelectCodeFile={setActiveCodeFile}
+                onToggleCollapse={() => setIsGuideSectionOpen(false)}
+                onLoadStarterCode={(code) => {
+                  if (phaseDetail) {
+                    setPhaseDetail({ ...phaseDetail, starter_code: code });
+                  }
+                }}
+              />
+            </div>
+          </aside>
+
+          {/* 宽度拖拽手柄（双击恢复默认宽度），抽屉收起时一并隐藏 */}
+          {!sidebarCollapsed && (
+            <div
+              className={`wb-resize-handle ${isResizingDrawer ? 'dragging' : ''}`}
+              onMouseDown={handleDrawerResizeStart}
+              onDoubleClick={handleDrawerResizeReset}
+              title="按住左右拖拽调整面板宽度（双击恢复默认）"
+            />
+          )}
 
           {/* 右栏：极简 Monaco 实战沙箱控制台 (主题联动) */}
           <CodeConsole

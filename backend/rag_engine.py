@@ -2,6 +2,7 @@ import os
 import sys
 import jieba
 from pathlib import Path
+from urllib.parse import urlparse, unquote
 
 # 添加 project root 到 sys.path，以便能引用 document_processor
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -20,13 +21,61 @@ from dfl_engine import dfl_fusion
 def chinese_tokenizer(text):
     return list(jieba.cut(text))
 
+
+# 项目根目录（backend 的上一级），用于把语料目录固定为绝对路径
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
+
+def _default_data_dir() -> str:
+    """知识库语料目录的唯一权威定义（绝对路径）。"""
+    return os.path.join(_PROJECT_ROOT, 'document_processor', 'samples')
+
+
+# 只索引这些子目录/前缀；未列入且不符合白名单规则的文件会被跳过。
+# 目的：把 grand_project-*.mp3（4.8MB 音频）与大量 test_* 测试数据挡在索引之外，
+# 避免真正的业务语料被测试垃圾稀释检索质量。
+_INDEX_DENY_DIR_PARTS = {'.agents', 'venv', '.venv', 'chroma_db', '__pycache__', '.git', 'node_modules'}
+_INDEX_DENY_FILENAME_PREFIXES = ('test_', 'test-')
+_INDEX_DENY_FILENAME_SUBSTRINGS = ('grand_project', 'sample_', 'dummy')
+_INDEX_DENY_EXTS = {'.mp3', '.wav', '.m4a', '.ogg', '.flac', '.webm'}
+
+
+def _should_index_file(path: Path) -> bool:
+    """判定某个文件是否应纳入知识库索引（白名单式排除）。"""
+    path_str = str(path)
+    lowered = path_str.lower()
+
+    for part in _INDEX_DENY_DIR_PARTS:
+        if f"{os.sep}{part}{os.sep}" in path_str or path_str.endswith(f"{os.sep}{part}"):
+            return False
+
+    name = path.name.lower()
+    if name.startswith('.'):
+        return False
+    if name.startswith(_INDEX_DENY_FILENAME_PREFIXES):
+        return False
+    if any(token in name for token in _INDEX_DENY_FILENAME_SUBSTRINGS):
+        return False
+    if path.suffix.lower() in _INDEX_DENY_EXTS:
+        return False
+    # 忽略 macOS 元数据等杂项
+    if lowered.endswith('.ds_store'):
+        return False
+    return True
+
 class RAGEngine:
-    def __init__(self, data_dir="../document_processor/samples"):
-        self.data_dir = data_dir
+    def __init__(self, data_dir=None):
+        # 统一使用「绝对路径 + 白名单」定位知识库语料目录。
+        # 此前默认值是相对路径 "../document_processor/samples"，依赖进程 CWD；
+        # 而 knowledge_api.py / worker.py 各自又算了一份路径，三处容易指向不同目录。
+        self.data_dir = data_dir or _default_data_dir()
         self.persist_dir = os.path.join(os.path.dirname(__file__), 'chroma_db')
         self._embeddings = None
         self._model_dir = None
         self.ensemble_retriever = None
+        # 索引健康状态：供上层区分「正常」与「降级」，避免静默失败被长期忽略
+        self.status = "uninitialized"
+        self.status_detail = ""
         # 支持通过 document_processor 解析的所有格式
         self.supported_exts = {'.pdf', '.docx', '.doc', '.xlsx', '.xls', '.txt', '.md', '.csv', '.json', '.pptx', '.html', '.htm', '.xml'}
 
@@ -63,10 +112,43 @@ class RAGEngine:
         conn = None
         cursor = None
         try:
-            conn = psycopg2.connect(dbname="ailearning", user="aiuser", password="aipassword", host="localhost", port="5432")
+            database_url = os.getenv("DATABASE_URL") or os.getenv("ASYNC_DATABASE_URL")
+            if not database_url:
+                raise RuntimeError("DATABASE_URL or ASYNC_DATABASE_URL must be configured")
+            parsed_db = urlparse(database_url)
+            if parsed_db.scheme.startswith("postgresql"):
+                conn = psycopg2.connect(
+                    dbname=parsed_db.path.lstrip("/") or "ailearning",
+                    user=parsed_db.username or "aiuser",
+                    # 连接串里的口令是百分号编码的（# -> %23、@ -> %40 等），
+                    # urlparse 不会自动解码，必须显式 unquote，否则含特殊字符的
+                    # 强密码会以编码态送进数据库导致 password authentication failed。
+                    password=unquote(parsed_db.password) if parsed_db.password else "",
+                    host=parsed_db.hostname or "localhost",
+                    port=parsed_db.port or 5432,
+                )
+            else:
+                raise ValueError("RAG document index requires a PostgreSQL DATABASE_URL")
             cursor = conn.cursor()
+            # 兜底建表：迁移 004 会创建它，但部署顺序未必可靠（例如先起服务后跑迁移）。
+            # 这里做幂等补建，确保「知识库可用」不依赖外部执行顺序。
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS document_hashes (
+                    id BIGSERIAL PRIMARY KEY,
+                    filename TEXT NOT NULL,
+                    filepath TEXT NOT NULL UNIQUE,
+                    md5_hash TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+            """)
+            conn.commit()
         except Exception as e:
-            print("[RAG] 外部 Postgres 离线，无缝切换为本地 Chroma + BM25 持久化轻量加载模式:", e)
+            # 显式记录降级状态。此前这里只打印一句"无缝切换"，让调用方误以为一切正常，
+            # 实际文档指纹表缺失导致检索能力整体失效却无人察觉。
+            self.status = "degraded"
+            self.status_detail = f"Postgres 不可用，已降级为本地 Chroma + BM25 缓存模式: {e}"
+            print(f"[RAG] ⚠️ 降级运行（知识库检索质量下降）: {e}")
             vectorstore = Chroma(persist_directory=self.persist_dir, embedding_function=self.embeddings)
             self.chroma_retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
             import pickle
@@ -75,8 +157,8 @@ class RAGEngine:
                 with open(bm25_path, 'rb') as f:
                     self.bm25_retriever = pickle.load(f)
             else:
-                dummy_docs = [Document(page_content="系统极速自愈启动，知识库就绪。", metadata={"source": "system"})]
-                self.bm25_retriever = BM25Retriever.from_documents(dummy_docs)
+                fallback_docs = [Document(page_content="知识库索引为空或不可用，请检查数据库、向量索引和模型缓存状态。", metadata={"source": "system_fallback", "rag_status": "degraded"})]
+                self.bm25_retriever = BM25Retriever.from_documents(fallback_docs)
             self.ensemble_retriever = EnsembleRetriever(
                 retrievers=[self.bm25_retriever, self.chroma_retriever],
                 weights=[0.5, 0.5]
@@ -89,11 +171,10 @@ class RAGEngine:
         current_files = {}
         for ext in self.supported_exts:
             for path in Path(self.data_dir).rglob(f'*{ext}'):
-                path_str = str(path)
-                if '.agents' in path_str or 'venv' in path_str or 'chroma_db' in path_str or '__pycache__' in path_str or '.git' in path_str:
+                # 白名单式过滤：排除测试数据、音频、缓存目录等非业务语料
+                if not _should_index_file(path):
                     continue
-                current_files[path_str] = compute_md5(path_str)
-                
+                current_files[str(path)] = compute_md5(str(path))
         added = []
         modified = []
         deleted = []
@@ -125,13 +206,15 @@ class RAGEngine:
                 with open(bm25_path, 'rb') as f:
                     self.bm25_retriever = pickle.load(f)
             else:
-                dummy_docs = [Document(page_content="系统已经极速热启动，无需重新扫描 3 万个文件。", metadata={"source": "system"})]
-                self.bm25_retriever = BM25Retriever.from_documents(dummy_docs)
+                fallback_docs = [Document(page_content="BM25 索引缺失；当前无法提供关键词检索结果。", metadata={"source": "system_fallback", "rag_status": "degraded"})]
+                self.bm25_retriever = BM25Retriever.from_documents(fallback_docs)
                 
             self.ensemble_retriever = EnsembleRetriever(
                 retrievers=[self.bm25_retriever, self.chroma_retriever],
                 weights=[0.5, 0.5]
             )
+            self.status = "ok"
+            self.status_detail = "索引无变更，已直接加载现有向量与 BM25 索引"
             cursor.close()
             conn.close()
             return
@@ -175,7 +258,8 @@ class RAGEngine:
         conn.close()
         
         try:
-            r = redis.Redis(host='localhost', port=6379, db=0)
+            redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+            r = redis.Redis.from_url(redis_url)
             r.flushdb()
             import shutil
             cache_dir = os.path.join(os.path.dirname(__file__), 'chroma_cache')
@@ -207,6 +291,70 @@ class RAGEngine:
             retrievers=[self.bm25_retriever, self.chroma_retriever],
             weights=[0.5, 0.5]
         )
+        self.status = "ok"
+        self.status_detail = f"增量重建完成: 新增 {len(added)}, 修改 {len(modified)}, 删除 {len(deleted)}"
+
+    def get_status(self) -> dict:
+        """暴露索引健康状态，供 /health 与知识库接口区分「正常」与「降级」。"""
+        return {
+            "status": self.status,
+            "detail": self.status_detail,
+            "ready": self.ensemble_retriever is not None,
+            "data_dir": self.data_dir,
+            "degraded": self.status == "degraded",
+        }
+
+    def has_pending_changes(self) -> bool:
+        """检测语料目录相对索引指纹是否有变更（供上传后自动增量索引用）。"""
+        import hashlib
+        conn = None
+        cursor = None
+        try:
+            import psycopg2
+            database_url = os.getenv("DATABASE_URL") or os.getenv("ASYNC_DATABASE_URL")
+            if not database_url:
+                return True
+            parsed_db = urlparse(database_url)
+            conn = psycopg2.connect(
+                dbname=parsed_db.path.lstrip("/") or "ailearning",
+                user=parsed_db.username or "aiuser",
+                password=unquote(parsed_db.password) if parsed_db.password else "",
+                host=parsed_db.hostname or "localhost",
+                port=parsed_db.port or 5432,
+            )
+            cursor = conn.cursor()
+            cursor.execute("SELECT filepath, md5_hash FROM document_hashes")
+            db_hashes = {row[0]: row[1] for row in cursor.fetchall()}
+
+            current = {}
+            for ext in self.supported_exts:
+                for path in Path(self.data_dir).rglob(f'*{ext}'):
+                    if not _should_index_file(path):
+                        continue
+                    h = hashlib.md5()
+                    with open(path, "rb") as f:
+                        for chunk in iter(lambda: f.read(4096), b""):
+                            h.update(chunk)
+                    current[str(path)] = h.hexdigest()
+
+            for fp, md5 in current.items():
+                if db_hashes.get(fp) != md5:
+                    return True
+            for fp in db_hashes:
+                if fp not in current:
+                    return True
+            return False
+        except Exception:
+            # 无法判定时按「有变更」处理，宁可多重建一次也不漏掉新上传的文档
+            return True
+        finally:
+            try:
+                if cursor:
+                    cursor.close()
+                if conn:
+                    conn.close()
+            except Exception:
+                pass
 
     @traceable(name="hybrid_rag_retrieve", run_type="retriever", tags=["rag_retriever", "bm25_chroma", "observability"])
     def retrieve(self, query: str, k=6):

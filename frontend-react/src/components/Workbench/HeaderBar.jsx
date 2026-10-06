@@ -14,7 +14,6 @@ export default function HeaderBar({
   sandboxReady = true,
   currentMode = 'workbench',
   sidebarCollapsed = false,
-  guideCollapsed = false,
   currentTheme = 'obsidian',
   currentTenant = null,
   currentUser = null,
@@ -211,10 +210,9 @@ export default function HeaderBar({
               className="wb-btn-ghost"
               style={{
                 padding: '3px 6px',
-                color: guideCollapsed ? 'var(--wb-text-dim)' : 'var(--wb-text-bright)',
-                background: guideCollapsed ? 'transparent' : 'var(--wb-bg-subtle)'
+                color: 'var(--wb-text-bright)'
               }}
-              title={guideCollapsed ? '展开指导书' : '收起指导书'}
+              title="展开指导书（在左侧抽屉中显示当前关卡的实验指南）"
             >
               <PanelRight size={13} />
             </button>
@@ -224,9 +222,9 @@ export default function HeaderBar({
               className="wb-btn-ghost"
               style={{
                 padding: '3px 6px',
-                color: (sidebarCollapsed && guideCollapsed) ? 'var(--wb-accent-subtle)' : 'var(--wb-text-dim)'
+                color: sidebarCollapsed ? 'var(--wb-accent-subtle)' : 'var(--wb-text-dim)'
               }}
-              title="Zen 全屏专注模式 (代码最大化)"
+              title="Zen 全屏专注模式 (仅保留代码区)"
             >
               <Maximize2 size={13} />
             </button>

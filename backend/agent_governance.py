@@ -11,7 +11,9 @@ import asyncpg
 
 
 def _database_url() -> str:
-    url = os.getenv("ASYNC_DATABASE_URL", "postgresql://aiuser:aipassword@localhost:5432/ailearning")
+    url = os.getenv("ASYNC_DATABASE_URL") or os.getenv("DATABASE_URL")
+    if not url:
+        raise RuntimeError("ASYNC_DATABASE_URL or DATABASE_URL must be configured")
     return url.replace("postgresql+asyncpg://", "postgresql://", 1).replace("postgresql+psycopg://", "postgresql://", 1)
 
 

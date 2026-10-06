@@ -187,13 +187,54 @@ async def delete_document(filename: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"删除文件失败: {str(e)}")
 
+@router.get("/status")
+async def get_knowledge_status():
+    """
+    查询知识库索引健康状态。
+
+    背景：rag_engine.build_or_load() 在数据库不可用时会降级为「本地 Chroma + BM25
+    缓存」模式，检索质量明显下降。此前该状态只写入日志，接口层完全看不到，
+    导致知识库实际上已经失效但页面仍显示正常。本接口把降级状态显式暴露出来。
+    """
+    try:
+        from rag_engine import rag_engine
+        state = rag_engine.get_status()
+        if not state.get("ready"):
+            # 尚未构建过索引：首次调用间接触发一次构建，避免返回 uninitialized 让前端
+            # 误判为「不可用」。构建失败也会走降级分支并返回 degraded。
+            rag_engine.build_or_load()
+            state = rag_engine.get_status()
+        return {"status": "success", "data": state}
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": f"读取知识库状态失败: {str(e)}",
+            },
+        )
+
+
 @router.post("/reindex")
 async def trigger_reindex():
     """手动触发知识库向量全量/增量重构"""
     try:
         from rag_engine import rag_engine
         rag_engine.build_or_load()
-        return {"status": "success", "message": "知识库全量索引同步与重建已成功触发完成！"}
+        state = rag_engine.get_status()
+        # build_or_load 不抛异常也可能是降级结果（例如 Postgres 连不上），
+        # 因此以真实状态为准返回，不再无条件报 success。
+        if state.get("degraded"):
+            return {
+                "status": "degraded",
+                "message": f"知识库以降级模式加载，检索质量下降: {state.get('detail', '')}",
+                "data": state,
+            }
+        return {
+            "status": "success",
+            "message": "知识库索引同步与重建已完成！",
+            "data": state,
+        }
     except Exception as e:
         return {"status": "degraded", "message": f"知识库已更新，向量同步稍后重试: {str(e)}"}
 

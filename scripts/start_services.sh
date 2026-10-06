@@ -3,13 +3,11 @@ set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND_DIR="$ROOT_DIR/backend"
-FRONTEND_DIR="$ROOT_DIR/frontend"
 FRONTEND_REACT_DIR="$ROOT_DIR/frontend-react"
 LOG_DIR="$ROOT_DIR/logs"
 
 BACKEND_PORT="${BACKEND_PORT:-8000}"
-FRONTEND_PORT="${FRONTEND_PORT:-5173}"
-FRONTEND_REACT_PORT="${FRONTEND_REACT_PORT:-5174}"
+FRONTEND_REACT_PORT="${FRONTEND_REACT_PORT:-5173}"
 GATEWAY_PORT="${GATEWAY_PORT:-8080}"
 
 WITH_GATEWAY=0
@@ -33,7 +31,6 @@ Options:
 
 Environment overrides:
   BACKEND_PORT=${BACKEND_PORT}
-  FRONTEND_PORT=${FRONTEND_PORT}
   FRONTEND_REACT_PORT=${FRONTEND_REACT_PORT}
   GATEWAY_PORT=${GATEWAY_PORT}
 EOF
@@ -280,14 +277,6 @@ start_celery() {
 }
 
 start_frontend() {
-  ensure_node_deps "$FRONTEND_DIR" "frontend"
-  mkdir -p "$LOG_DIR"
-  log "Starting frontend on port $FRONTEND_PORT"
-  spawn_detached "$FRONTEND_DIR" "$LOG_DIR/frontend-${FRONTEND_PORT}.log" "$LOG_DIR/frontend-${FRONTEND_PORT}.pid" \
-    npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT" --strictPort
-}
-
-start_frontend_react() {
   ensure_node_deps "$FRONTEND_REACT_DIR" "frontend-react"
   mkdir -p "$LOG_DIR"
   log "Starting frontend-react on port $FRONTEND_REACT_PORT"
@@ -327,7 +316,6 @@ print_status() {
   show_port_status 5432 "PostgreSQL"
   show_port_status 6379 "Redis"
   show_port_status "$BACKEND_PORT" "Backend"
-  show_port_status "$FRONTEND_PORT" "Frontend"
   show_port_status "$FRONTEND_REACT_PORT" "Frontend React"
   show_port_status "$GATEWAY_PORT" "Gateway"
   compose_services_status
@@ -335,7 +323,6 @@ print_status() {
 
 stop_apps() {
   stop_port "$FRONTEND_REACT_PORT" "Frontend React"
-  stop_port "$FRONTEND_PORT" "Frontend"
   stop_port "$GATEWAY_PORT" "Gateway"
   stop_port "$BACKEND_PORT" "Backend"
 }
@@ -418,14 +405,10 @@ main() {
   fi
 
   start_frontend
-  wait_for_http "http://127.0.0.1:${FRONTEND_PORT}/" "Frontend"
-
-  start_frontend_react
   wait_for_http "http://127.0.0.1:${FRONTEND_REACT_PORT}/" "Frontend React"
 
   log "Startup complete"
   log "Backend:        http://localhost:${BACKEND_PORT}/docs"
-  log "Frontend:       http://localhost:${FRONTEND_PORT}/"
   log "Frontend React: http://localhost:${FRONTEND_REACT_PORT}/"
   if [[ "$WITH_GATEWAY" -eq 1 ]]; then
     log "Gateway:        http://localhost:${GATEWAY_PORT}/docs"

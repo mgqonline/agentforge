@@ -14,6 +14,8 @@ import base64
 import hashlib
 import hmac
 import json
+import os
+import secrets
 import sqlite3
 import time
 from datetime import datetime, timedelta
@@ -24,9 +26,23 @@ from typing import Any, Callable, Dict, List, Optional
 from fastapi import Depends, HTTPException, Header, Request, status
 from pydantic import BaseModel, Field
 
-# 生产环境密钥（生产中通过 .env 注入，禁止使用默认弱口令）
-DEFAULT_JWT_SECRET = "agentforge_enterprise_production_secret_key_2026"
+# JWT 密钥必须由环境变量注入；仅开发/测试环境允许使用进程级临时密钥。
 DEFAULT_JWT_ALGORITHM = "HS256"
+_MIN_SECRET_LENGTH = 32
+_EPHEMERAL_JWT_SECRET = secrets.token_urlsafe(48)
+
+
+def _runtime_env() -> str:
+    return os.getenv("APP_ENV", os.getenv("ENV", "development")).strip().lower()
+
+
+def _get_jwt_secret() -> str:
+    secret = os.getenv("JWT_SECRET") or os.getenv("APP_SECRET")
+    if secret and len(secret) >= _MIN_SECRET_LENGTH:
+        return secret
+    if _runtime_env() in {"production", "prod", "staging"}:
+        raise RuntimeError("JWT_SECRET or APP_SECRET must be set to at least 32 characters in production-like environments")
+    return _EPHEMERAL_JWT_SECRET
 
 # 物理持久化 SQLite 数据库路径 (保证服务重启后账号、角色、配额与审计流水不丢失)
 AUTH_DB_PATH = Path(__file__).resolve().parent / "auth.db"
@@ -67,8 +83,26 @@ class TenantQuota(BaseModel):
 
 
 def _hash_pwd(pwd: str) -> str:
-    """内部轻量安全哈希"""
+    """使用 PBKDF2-HMAC-SHA256 生成带随机盐的密码哈希。"""
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac("sha256", pwd.encode("utf-8"), salt.encode("utf-8"), 200_000)
+    return f"pbkdf2_sha256$200000${salt}${digest.hex()}"
+
+
+def _legacy_hash_pwd(pwd: str) -> str:
     return hashlib.sha256(f"salt_agentforge_2026_{pwd}".encode("utf-8")).hexdigest()
+
+
+def _verify_pwd(pwd: str, stored_hash: str) -> bool:
+    """校验新格式密码哈希，并兼容历史 SHA-256 哈希。"""
+    if stored_hash.startswith("pbkdf2_sha256$"):
+        try:
+            _, rounds_raw, salt, digest_hex = stored_hash.split("$", 3)
+            digest = hashlib.pbkdf2_hmac("sha256", pwd.encode("utf-8"), salt.encode("utf-8"), int(rounds_raw))
+            return hmac.compare_digest(digest.hex(), digest_hex)
+        except ValueError:
+            return False
+    return hmac.compare_digest(stored_hash, _legacy_hash_pwd(pwd))
 
 # 默认基础预置数据清单
 _DEFAULT_TENANTS = [
@@ -205,6 +239,59 @@ def _init_and_sync_db():
             execution_metrics TEXT DEFAULT '{}',
             UNIQUE(user_id, phase_id)
         );
+        """)
+
+        # 4.1 掌握度证据字段迁移 (幂等：已存在则跳过)
+        # 背景：原表只记录 passed 一个布尔值，无法区分「一次做对」与「试错 20 次才过」。
+        # 这里补齐学习过程证据，为「按证据推导评分」提供数据基础。
+        cur.execute("PRAGMA table_info(user_progress)")
+        existing_cols = {row["name"] for row in cur.fetchall()}
+        _mastery_columns = [
+            ("attempts_total", "INTEGER NOT NULL DEFAULT 0"),   # 累计提交次数 (含失败)
+            ("attempts_failed", "INTEGER NOT NULL DEFAULT 0"),  # 失败次数
+            ("first_attempt_passed", "INTEGER NOT NULL DEFAULT 0"),  # 是否首次提交即通过
+            ("time_spent_ms", "INTEGER NOT NULL DEFAULT 0"),    # 累计解题耗时
+            ("hints_used", "INTEGER NOT NULL DEFAULT 0"),       # 求助 AI 伴学次数
+            ("mastery_score", "REAL NOT NULL DEFAULT 0"),       # 由证据推导的掌握度 0-100
+            ("mastery_level", "TEXT NOT NULL DEFAULT ''"),      # A/B/C/D 等级
+            ("last_failure_kind", "TEXT NOT NULL DEFAULT ''"),  # 最近一次失败类型
+        ]
+        for col_name, col_def in _mastery_columns:
+            if col_name not in existing_cols:
+                cur.execute(f"ALTER TABLE user_progress ADD COLUMN {col_name} {col_def}")
+
+        # 4.2 新建学员概念级掌握度画像表 (跨会话长期记忆)
+        # 背景：导师此前无跨会话记忆，无法指出「你在第 05 关和第 07 关犯的是同一个错」。
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS learner_mastery (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            concept TEXT NOT NULL,
+            phase_id TEXT NOT NULL,
+            encounters INTEGER NOT NULL DEFAULT 0,
+            failures INTEGER NOT NULL DEFAULT 0,
+            last_seen_at INTEGER NOT NULL,
+            mastery REAL NOT NULL DEFAULT 0,
+            UNIQUE(user_id, concept)
+        );
+        """)
+
+        # 4.3 新建学习事件流水表 (为复盘与难度校准提供原始依据)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS learning_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            phase_id TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            failure_kind TEXT DEFAULT '',
+            duration_ms INTEGER NOT NULL DEFAULT 0,
+            detail TEXT DEFAULT '{}',
+            created_at INTEGER NOT NULL
+        );
+        """)
+        cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_learning_events_user
+        ON learning_events (user_id, created_at)
         """)
         conn.commit()
 
@@ -404,9 +491,10 @@ def create_access_token(
     role: UserRole,
     username: Optional[str] = None,
     expires_delta: Optional[timedelta] = None,
-    secret_key: str = DEFAULT_JWT_SECRET,
+    secret_key: Optional[str] = None,
 ) -> str:
     """签发合规的企业级 JWT 令牌"""
+    secret_key = secret_key or _get_jwt_secret()
     now = int(time.time())
     expire = (
         now + int(expires_delta.total_seconds())
@@ -437,9 +525,10 @@ def create_access_token(
 
 
 def verify_access_token(
-    token: str, secret_key: str = DEFAULT_JWT_SECRET
+    token: str, secret_key: Optional[str] = None
 ) -> TokenPayload:
     """校验 JWT 令牌完整性、签名与时效"""
+    secret_key = secret_key or _get_jwt_secret()
     parts = token.split(".")
     if len(parts) != 3:
         raise HTTPException(
@@ -614,7 +703,7 @@ def authenticate_user(username: str, password: str) -> Optional[UserRecord]:
     user = USER_STORE.get(username)
     if not user:
         return None
-    if user.password_hash != _hash_pwd(password):
+    if not _verify_pwd(password, user.password_hash):
         return None
     return user
 
@@ -871,12 +960,14 @@ def save_user_progress(
 
 
 def get_user_progress_map(user_id: str) -> Dict[str, Any]:
-    """查询指定用户在所有关卡的通关历史与代码快照映射"""
+    """查询指定用户在所有关卡的通关历史、代码快照与掌握度证据映射"""
     res: Dict[str, Any] = {}
     with _get_db() as conn:
         cur = conn.cursor()
         cur.execute("""
-        SELECT phase_id, passed, xp_earned, completed_at, saved_code, execution_metrics
+        SELECT phase_id, passed, xp_earned, completed_at, saved_code, execution_metrics,
+               attempts_total, attempts_failed, first_attempt_passed,
+               time_spent_ms, hints_used, mastery_score, mastery_level, last_failure_kind
         FROM user_progress
         WHERE user_id = ?
         """, (user_id,))
@@ -891,9 +982,290 @@ def get_user_progress_map(user_id: str) -> Dict[str, Any]:
                 "xpEarned": row["xp_earned"],
                 "completedAt": row["completed_at"],
                 "savedCode": row["saved_code"] or "",
+                # 掌握度证据（旧行回退为 0/空，保证向后兼容）
+                "attemptsTotal": row["attempts_total"] or 0,
+                "attemptsFailed": row["attempts_failed"] or 0,
+                "firstAttemptPassed": bool(row["first_attempt_passed"]),
+                "timeSpentMs": row["time_spent_ms"] or 0,
+                "hintsUsed": row["hints_used"] or 0,
+                "masteryScore": row["mastery_score"] or 0,
+                "masteryLevel": row["mastery_level"] or "",
+                "lastFailureKind": row["last_failure_kind"] or "",
                 **metrics
             }
     return res
+
+
+# =====================================================================
+# 3.6 学习过程证据采集与学员掌握度画像
+# =====================================================================
+
+def record_attempt(
+    user_id: str,
+    username: str,
+    tenant_id: str,
+    phase_id: str,
+    passed: bool,
+    duration_ms: int = 0,
+    failure_kind: str = "",
+    detail: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """记录一次关卡提交尝试（成功或失败），并回报累计证据。
+
+    与 save_user_progress 的分工：
+      - record_attempt 负责「过程」：每次提交都记，用于推导掌握度。
+      - save_user_progress 负责「结果」：通关时落盘代码快照与最终评分。
+
+    这是把「二值通过」升级为「可观测学习过程」的关键入口。
+    """
+    ts = int(time.time() * 1000)
+    duration_ms = max(0, int(duration_ms or 0))
+    kind = failure_kind or ""
+
+    with _get_db() as conn:
+        cur = conn.cursor()
+        # 1. 落盘原始事件流水（供复盘与难度校准）
+        cur.execute("""
+        INSERT INTO learning_events (user_id, phase_id, event_type, failure_kind, duration_ms, detail, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            user_id, phase_id,
+            "attempt_passed" if passed else "attempt_failed",
+            kind, duration_ms,
+            json.dumps(detail or {}, ensure_ascii=False), ts,
+        ))
+
+        # 2. 读取当前累计证据
+        cur.execute("""
+        SELECT attempts_total, attempts_failed, first_attempt_passed,
+               time_spent_ms, hints_used
+        FROM user_progress
+        WHERE user_id = ? AND phase_id = ?
+        """, (user_id, phase_id))
+        row = cur.fetchone()
+
+        prev_total = row["attempts_total"] if row else 0
+        prev_failed = row["attempts_failed"] if row else 0
+        prev_time = row["time_spent_ms"] if row else 0
+        prev_hints = row["hints_used"] if row else 0
+
+        new_total = prev_total + 1
+        new_failed = prev_failed + (0 if passed else 1)
+        # 首次提交即通过：只有第一次尝试且通过才为真
+        first_passed = 1 if (passed and new_total == 1) else (row["first_attempt_passed"] if row else 0)
+        new_time = prev_time + duration_ms
+        new_kind = "" if passed else (kind or "unknown")
+
+        if row:
+            # 注意：record_attempt 同时负责在通过时置位 passed。
+            # 否则会出现「评测通过但进度仍显示未通关」的数据不一致。
+            cur.execute("""
+            UPDATE user_progress
+            SET attempts_total = ?, attempts_failed = ?, first_attempt_passed = ?,
+                time_spent_ms = ?, last_failure_kind = ?,
+                passed = CASE WHEN ? = 1 THEN 1 ELSE passed END
+            WHERE user_id = ? AND phase_id = ?
+            """, (new_total, new_failed, first_passed, new_time, new_kind,
+                  1 if passed else 0, user_id, phase_id))
+        else:
+            # 尚未通关的关卡也需要占位行，否则第一次失败无处记录。
+            # 注意：passed 必须按本次结果写入，否则「首试即通过」会被误记为未通关。
+            cur.execute("""
+            INSERT INTO user_progress
+                (user_id, username, tenant_id, phase_id, passed, xp_earned, completed_at,
+                 saved_code, execution_metrics, attempts_total, attempts_failed,
+                 first_attempt_passed, time_spent_ms, hints_used, last_failure_kind)
+            VALUES (?, ?, ?, ?, ?, 0, ?, '', '{}', ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, phase_id) DO UPDATE SET
+                attempts_total = ?, attempts_failed = ?, first_attempt_passed = ?,
+                time_spent_ms = ?, last_failure_kind = ?,
+                passed = CASE WHEN ? = 1 THEN 1 ELSE passed END
+            """, (
+                user_id, username, tenant_id, phase_id, 1 if passed else 0, ts,
+                new_total, new_failed, first_passed, new_time, prev_hints, new_kind,
+                new_total, new_failed, first_passed, new_time, new_kind,
+                1 if passed else 0,
+            ))
+        conn.commit()
+
+    return {
+        "status": "success",
+        "attemptsTotal": new_total,
+        "attemptsFailed": new_failed,
+        "firstAttemptPassed": bool(first_passed),
+        "timeSpentMs": new_time,
+        "hintsUsed": prev_hints,
+        "lastFailureKind": new_kind,
+    }
+
+
+def record_hint_usage(user_id: str, phase_id: str, tenant_id: str = "", username: str = "") -> int:
+    """记录一次 AI 伴学求助，返回该关卡累计求助次数。
+
+    求助不是扣分项的主因（权重仅 0.20 且下限 50），但需要被记录，
+    以便区分「独立攻克」与「一路被扶着走」。
+    """
+    ts = int(time.time() * 1000)
+    with _get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+        SELECT hints_used FROM user_progress WHERE user_id = ? AND phase_id = ?
+        """, (user_id, phase_id))
+        row = cur.fetchone()
+        if row:
+            new_hints = (row["hints_used"] or 0) + 1
+            cur.execute("""
+            UPDATE user_progress SET hints_used = ? WHERE user_id = ? AND phase_id = ?
+            """, (new_hints, user_id, phase_id))
+        else:
+            new_hints = 1
+            cur.execute("""
+            INSERT INTO user_progress
+                (user_id, username, tenant_id, phase_id, passed, xp_earned, completed_at,
+                 saved_code, execution_metrics, hints_used)
+            VALUES (?, ?, ?, ?, 0, 0, ?, '', '{}', 1)
+            ON CONFLICT(user_id, phase_id) DO UPDATE SET hints_used = hints_used + 1
+            """, (user_id, username, tenant_id, phase_id, ts))
+
+        cur.execute("""
+        INSERT INTO learning_events (user_id, phase_id, event_type, failure_kind, duration_ms, detail, created_at)
+        VALUES (?, ?, 'hint_requested', '', 0, '{}', ?)
+        """, (user_id, phase_id, ts))
+        conn.commit()
+    return new_hints
+
+
+def get_mastery_evidence(user_id: str, phase_id: str) -> Dict[str, Any]:
+    """读取指定关卡当前累计的掌握度证据（供评分与导师参考）。"""
+    with _get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+        SELECT attempts_total, attempts_failed, first_attempt_passed,
+               time_spent_ms, hints_used, passed, last_failure_kind
+        FROM user_progress
+        WHERE user_id = ? AND phase_id = ?
+        """, (user_id, phase_id))
+        row = cur.fetchone()
+    if not row:
+        return {
+            "attemptsTotal": 0, "attemptsFailed": 0, "firstAttemptPassed": False,
+            "timeSpentMs": 0, "hintsUsed": 0, "passed": False, "lastFailureKind": "",
+        }
+    return {
+        "attemptsTotal": row["attempts_total"] or 0,
+        "attemptsFailed": row["attempts_failed"] or 0,
+        "firstAttemptPassed": bool(row["first_attempt_passed"]),
+        "timeSpentMs": row["time_spent_ms"] or 0,
+        "hintsUsed": row["hints_used"] or 0,
+        "passed": bool(row["passed"]),
+        "lastFailureKind": row["last_failure_kind"] or "",
+    }
+
+
+def save_mastery_result(user_id: str, phase_id: str, score: float, level: str) -> None:
+    """把推导出的掌握度评分写回进度表。"""
+    with _get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+        UPDATE user_progress SET mastery_score = ?, mastery_level = ?
+        WHERE user_id = ? AND phase_id = ?
+        """, (float(score), level or "", user_id, phase_id))
+        conn.commit()
+
+
+def update_learner_mastery(
+    user_id: str,
+    concept: str,
+    phase_id: str,
+    failed: bool,
+) -> Dict[str, Any]:
+    """按概念增量更新学员掌握度画像（跨会话长期记忆的核心存储）。"""
+    from mastery_engine import update_concept_mastery
+
+    ts = int(time.time() * 1000)
+    with _get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+        SELECT encounters, failures, mastery FROM learner_mastery
+        WHERE user_id = ? AND concept = ?
+        """, (user_id, concept))
+        row = cur.fetchone()
+
+        if row:
+            encounters = (row["encounters"] or 0) + 1
+            failures = (row["failures"] or 0) + (1 if failed else 0)
+            mastery = update_concept_mastery(row["mastery"] or 0.0, encounters, failures)
+            cur.execute("""
+            UPDATE learner_mastery
+            SET encounters = ?, failures = ?, mastery = ?, last_seen_at = ?, phase_id = ?
+            WHERE user_id = ? AND concept = ?
+            """, (encounters, failures, mastery, ts, phase_id, user_id, concept))
+        else:
+            encounters, failures = 1, (1 if failed else 0)
+            mastery = update_concept_mastery(0.0, encounters, failures)
+            cur.execute("""
+            INSERT INTO learner_mastery
+                (user_id, concept, phase_id, encounters, failures, last_seen_at, mastery)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, concept) DO UPDATE SET
+                encounters = encounters + 1,
+                failures = failures + ?,
+                last_seen_at = ?,
+                phase_id = ?
+            """, (user_id, concept, phase_id, encounters, failures, ts, mastery,
+                  1 if failed else 0, ts, phase_id))
+            # 冲突分支下以库内累计值为准重新读取，避免返回值与库内不一致
+            cur.execute("""
+            SELECT encounters, failures, mastery FROM learner_mastery
+            WHERE user_id = ? AND concept = ?
+            """, (user_id, concept))
+            row2 = cur.fetchone()
+            if row2:
+                encounters = row2["encounters"] or encounters
+                failures = row2["failures"] or failures
+                mastery = row2["mastery"] or mastery
+        conn.commit()
+
+    return {
+        "concept": concept,
+        "encounters": encounters,
+        "failures": failures,
+        "mastery": round(float(mastery), 1),
+    }
+
+
+def get_learner_profile(user_id: str, weakest_limit: int = 5) -> Dict[str, Any]:
+    """读取学员的跨会话掌握度画像，含最需要复习的薄弱概念。"""
+    with _get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+        SELECT concept, phase_id, encounters, failures, last_seen_at, mastery
+        FROM learner_mastery
+        WHERE user_id = ?
+        ORDER BY mastery ASC, failures DESC
+        """, (user_id,))
+        rows = cur.fetchall()
+
+    concepts = [
+        {
+            "concept": r["concept"],
+            "phaseId": r["phase_id"],
+            "encounters": r["encounters"] or 0,
+            "failures": r["failures"] or 0,
+            "mastery": round(float(r["mastery"] or 0), 1),
+            "lastSeenAt": r["last_seen_at"],
+        }
+        for r in rows
+    ]
+    weakest = [c for c in concepts if c["failures"] > 0][:weakest_limit]
+    avg = round(sum(c["mastery"] for c in concepts) / len(concepts), 1) if concepts else 0.0
+    return {
+        "userId": user_id,
+        "concepts": concepts,
+        "weakest": weakest,
+        "averageMastery": avg,
+        "trackedConcepts": len(concepts),
+    }
 
 
 # =====================================================================

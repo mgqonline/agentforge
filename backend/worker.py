@@ -369,7 +369,9 @@ async def async_process_request(
             "modality": "speech" if (audio_data or (file_upload and "audio" in str(file_upload.get("type", "")).lower())) else ("face_verification" if face_data else ("vision" if image_data else ("doc" if file_upload else "text"))),
             "history_length": len(history) if history else 0
         })
-    db_url = os.getenv("ASYNC_DATABASE_URL", "postgresql://aiuser:aipassword@localhost:5432/ailearning")
+    db_url = os.getenv("ASYNC_DATABASE_URL") or os.getenv("DATABASE_URL")
+    if not db_url:
+        raise RuntimeError("ASYNC_DATABASE_URL or DATABASE_URL must be configured")
     api_key = os.getenv("OPENAI_API_KEY", "dummy")
     base_url = os.getenv("OPENAI_API_BASE", "https://api.deepseek.com/v1")
     client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)

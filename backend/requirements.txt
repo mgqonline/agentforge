@@ -1,24 +1,74 @@
-langchain
-langchain-openai
-langgraph
-openai
+# ==========================================
+# AgentForge 后端依赖清单
+# 覆盖 backend/ 下全部 Python 模块的运行时导入
+# 安装: pip install -r backend/requirements.txt
+# ==========================================
+
+# ---- Web 框架与网关 ----
+fastapi
+uvicorn[standard]
 python-dotenv
-chromadb
-tiktoken
-mcp
-langchain-chroma
-langchain-community
-langchain-text-splitters
-sentence-transformers
-langchain-huggingface
-pymysql
+pydantic                  # 请求/响应模型与数据校验
+pydantic-settings         # 环境变量配置模型
+httpx                     # gateway.py 反向代理与限流
+httpx-sse                 # SSE 流式响应解析
+python-multipart          # 表单/文件上传解析
+websockets                # WebSocket 语音/对话通道
+
+# ---- 认证与安全 ----
+cryptography              # 令牌/签名加密原语
+PyJWT                     # JWT 签发与校验
+
+# ---- 数据库与持久化 ----
 SQLAlchemy
-celery
-redis
-psycopg2-binary
-asyncpg
+asyncpg                   # PostgreSQL 异步驱动
+psycopg2-binary           # PostgreSQL 同步驱动 (RAG 文档指纹表)
 psycopg[binary]
+aiosqlite                 # SQLite 异步驱动 (本地评测库)
+greenlet                  # SQLAlchemy 异步协程切换
+pymysql                   # MySQL 驱动 (教学示例章节使用)
+
+# ---- 缓存与任务队列 ----
+redis
+celery
+
+# ---- LLM / Agent 编排 ----
+openai
+langchain
+langchain-core
+langchain-openai
+langchain-community
+langchain-chroma
+langchain-classic        # rag_engine.py EnsembleRetriever
+langchain-text-splitters
+langchain-huggingface
+langchain-mcp-adapters   # orchestrator_graph.py MCP 工具加载
+langgraph
+mcp
+langsmith                # 全链路追踪与 traceable 装饰器
+tiktoken                 # OpenAI 分词计数
+
+# ---- 向量检索与本地模型 ----
+chromadb
+sentence-transformers
+modelscope               # bge-m3 模型快照下载
+jieba                    # 中文 BM25 分词
+rank-bm25
+numpy                    # worker.py 数值处理与向量运算
+torch                    # curriculum_engine.py 教学章节 PyTorch 示例
+
+# ---- 文档解析 ----
+PyMuPDF                  # import fitz, worker.py PDF 文本提取
+python-docx              # Word 文档解析
+openpyxl                 # Excel 文档解析
+python-pptx              # PPT 文档解析
+pandas                   # 表格数据处理
+
+# ---- 多模态 (视觉 / 语音 / 人脸) ----
 easyocr
 opencv-python-headless
 faster-whisper
 deepface
+
+# ---- 测试 ----
+pytest

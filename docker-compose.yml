@@ -4,9 +4,9 @@ services:
     container_name: ailearning_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-aiuser}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aipassword}
-      POSTGRES_DB: ${POSTGRES_DB:-ailearning}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set in .env}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -14,7 +14,7 @@ services:
     networks:
       - ailearning_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aiuser} -d ${POSTGRES_DB:-ailearning}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?POSTGRES_USER must be set in .env} -d ${POSTGRES_DB:?POSTGRES_DB must be set in .env}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -48,19 +48,16 @@ services:
       - .env
     environment:
       - PORT=6001
-      - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-aiuser}:${POSTGRES_PASSWORD:-aipassword}@postgres:5432/${POSTGRES_DB:-ailearning}
-      - ASYNC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-aiuser}:${POSTGRES_PASSWORD:-aipassword}@postgres:5432/${POSTGRES_DB:-ailearning}
+      - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:?POSTGRES_USER must be set in .env}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB must be set in .env}
+      - ASYNC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER must be set in .env}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB must be set in .env}
       - REDIS_URL=redis://redis:6379/0
       - ALLOWED_ORIGINS=http://localhost:6000,http://127.0.0.1:6000,http://localhost:6001,http://127.0.0.1:6001,http://localhost:6002,http://127.0.0.1:6002,http://localhost:8000,http://localhost:5173,http://localhost:5174
       - OPENAI_BASE_URL=https://api.deepseek.com
       - OPENAI_API_BASE=https://api.deepseek.com
     volumes:
-      - .:/app/curriculum:ro
-      - ./backend:/app/backend
       - ./chroma_db:/app/backend/chroma_db
       - ./models:/app/backend/models
       - ./logs:/app/backend/logs
-      - ./document_processor/samples:/app/document_processor/samples
     networks:
       - ailearning_net
     depends_on:
@@ -78,14 +75,12 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: frontend/Dockerfile
+      dockerfile: frontend-react/Dockerfile
     container_name: ailearning_frontend
     restart: unless-stopped
     ports:
       - "6002:80"
       - "6000:80"
-    volumes:
-      - ./frontend-react/dist:/usr/share/nginx/html/react:ro
     networks:
       - ailearning_net
     depends_on:

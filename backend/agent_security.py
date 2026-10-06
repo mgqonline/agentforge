@@ -11,7 +11,7 @@ from typing import Any
 
 import asyncpg
 
-DEFAULT_AUTH_SECRET = "dev-agent-auth-secret"
+_EPHEMERAL_AUTH_SECRET = secrets.token_urlsafe(48)
 _WS_TICKETS: dict[str, dict[str, Any]] = {}
 
 
@@ -45,7 +45,7 @@ class AuthContext:
 
 
 def _auth_secret() -> str:
-    return os.getenv("AGENT_AUTH_SECRET", os.getenv("APP_SECRET", DEFAULT_AUTH_SECRET))
+    return os.getenv("AGENT_AUTH_SECRET") or os.getenv("APP_SECRET") or _EPHEMERAL_AUTH_SECRET
 
 
 def _auth_required() -> bool:
@@ -61,14 +61,16 @@ def validate_security_config() -> None:
     production_like = _runtime_env() in {"prod", "production", "stage", "staging"}
     if production_like and not _auth_required():
         raise RuntimeError("AGENT_AUTH_REQUIRED must be true in production-like environments")
-    if _auth_required() and _auth_secret() == DEFAULT_AUTH_SECRET:
+    if _auth_required() and not (os.getenv("AGENT_AUTH_SECRET") or os.getenv("APP_SECRET")):
         raise RuntimeError("AGENT_AUTH_SECRET or APP_SECRET must be set when AGENT_AUTH_REQUIRED=true")
     if production_like and os.getenv("AGENT_ALLOW_DEV_AUTH", "false").lower() == "true":
         raise RuntimeError("AGENT_ALLOW_DEV_AUTH must not be enabled in production-like environments")
 
 
 def _database_url() -> str:
-    url = os.getenv("ASYNC_DATABASE_URL", "postgresql://aiuser:aipassword@localhost:5432/ailearning")
+    url = os.getenv("ASYNC_DATABASE_URL") or os.getenv("DATABASE_URL")
+    if not url:
+        raise RuntimeError("ASYNC_DATABASE_URL or DATABASE_URL must be configured")
     return url.replace("postgresql+asyncpg://", "postgresql://", 1).replace("postgresql+psycopg://", "postgresql://", 1)
 
 

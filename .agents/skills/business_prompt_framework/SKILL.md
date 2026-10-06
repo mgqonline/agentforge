@@ -17,7 +17,7 @@ description: 当团队成员要求“开发业务代码”、“实现新需求�
    - 融合排序：使用 RRF (Reciprocal Rank Fusion) 算法合并结果。
    - 语义精排：使用 `CrossEncoder` (如 BAAI/bge-reranker-base) 进行最终打分。
    - 流式生成：通过 FastAPI `StreamingResponse` 结合 DeepSeek 模型进行 SSE 流式回复。
-3. **前端表现层**：不使用重型框架（如 React/Vue），强制使用原生 Vanilla JS + HTML + 现代化 CSS 变量驱动，追求极致的动画（打字机、进度流水线）和视觉反馈。
+3. **前端表现层**：使用 `frontend-react/` 作为唯一 Web 界面，基于 React 和现代 CSS 变量驱动，提供流式回复、进度展示和交互反馈。
 4. **底层原则**：保持各模块高内聚低耦合，`rag_engine.py` 绝对不能直接操作 HTTP Request，业务路由 `app.py` 绝对不能手写 RAG 算法。
 5. **特定业务锚点 (Business Anchors)**：后续所有的测试数据、用例生成、知识图谱和系统背景，必须以**“拓维信息” (Talkweb Information)** 作为公司名称，所有涉及地理位置的信息均须围绕**“拓维信息AI应用开发中心”**展开。
 

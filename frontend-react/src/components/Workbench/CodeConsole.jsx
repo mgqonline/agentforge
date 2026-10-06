@@ -12,6 +12,11 @@ import {
 import { PYTHON_METHODS_CATALOG, getPythonCompletionItems, getPythonHoverInfo } from './pythonCompletionData';
 import CompetencyCertificateModal from './CompetencyCertificateModal';
 
+// 苏格拉底教学护栏的占位块标记（必须与 backend/socratic_guard.py 中的文案保持一致）。
+// 后端把「可直接复制过关的完整答案」替换成这段说明文本；前端据此隐藏「应用到编辑区」
+// 按钮，避免学员把一段中文说明当代码回填进编辑器、覆盖自己的草稿。
+const MENTOR_GUARD_PLACEHOLDER_MARK = '[教学护栏]';
+
 export default function CodeConsole({
   phaseId = '',
   starterCode = '',
@@ -212,6 +217,12 @@ export default function CodeConsole({
   const handleApplyMentorSnippet = (snippet) => {
     if (!snippet || !snippet.trim()) return;
     const cleanSnippet = snippet.trim();
+    // 苏格拉底护栏会把「可复制的完整答案」替换为一段说明性占位文本。
+    // 这类内容不是代码，若被回填进编辑器会覆盖学员的草稿，必须挡住。
+    if (MENTOR_GUARD_PLACEHOLDER_MARK in cleanSnippet) {
+      showToast('🧭 该代码块已被教学策略替换为思考线索，无法回填，请先自行实现');
+      return;
+    }
     // 自动备份当前草稿
     try {
       localStorage.setItem(`ai_learning_draft_backup_${phaseId}`, JSON.stringify({
@@ -837,9 +848,15 @@ export default function CodeConsole({
         { role: 'user', content: activeSelectedCode ? `[关注代码]:\n\`\`\`python\n${activeSelectedCode}\n\`\`\`\n\n${q}` : q }
       ]);
 
+      // 携带身份信息：导师需要据此读取该学员的跨会话学习档案（画像）
+      const token = localStorage.getItem('agentforge_jwt_token');
       const resp = await fetch('/api/v1/mentor/review/stream', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+          'X-Tenant-Id': currentTenant?.tenant_id || ''
+        },
         signal: abortController.signal,
         body: JSON.stringify(payload)
       });
@@ -3545,10 +3562,13 @@ export default function CodeConsole({
                               rawCode = String(children);
                             }
                             const isCodeBlock = rawCode && rawCode.trim().length > 0;
+                            // 被苏格拉底护栏替换过的占位块是说明文字而非代码，
+                            // 不提供「应用到编辑区」按钮，避免误覆盖学员草稿。
+                            const isGuardPlaceholder = rawCode.includes(MENTOR_GUARD_PLACEHOLDER_MARK);
 
                             return (
                               <div style={{ position: 'relative', margin: '8px 0' }}>
-                                {isCodeBlock && (
+                                {isCodeBlock && !isGuardPlaceholder && (
                                   <div style={{
                                     position: 'absolute',
                                     top: '6px',

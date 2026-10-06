@@ -15,6 +15,7 @@ export default function CurriculumNav({
   completedPhases = {},
   isChallengeMode = true,
   isCollapsed = false,
+  showHandle = true,
   isPhaseUnlocked = () => true,
   onToggleCollapse = () => {},
   onToggleChallengeMode = () => {},
@@ -71,14 +72,16 @@ export default function CurriculumNav({
           />
         </div>
 
-        <button
-          onClick={onToggleCollapse}
-          className="wb-btn-ghost"
-          style={{ padding: '4px' }}
-          title="收起侧栏 (释放空间)"
-        >
-          <ChevronLeft size={14} />
-        </button>
+        {showHandle && (
+          <button
+            onClick={onToggleCollapse}
+            className="wb-btn-ghost"
+            style={{ padding: '4px' }}
+            title="收起侧栏 (释放空间)"
+          >
+            <ChevronLeft size={14} />
+          </button>
+        )}
       </div>
 
       {/* 学习模式切换胶囊栏 */}

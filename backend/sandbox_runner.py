@@ -49,6 +49,12 @@ class CodeSecurityAuditor:
     # 6. 敏感凭据关键词
     SENSITIVE_KEY_PATTERNS = {"KEY", "SECRET", "TOKEN", "PASSWORD", "CREDENTIAL"}
 
+    # 7. 非敏感的 AI 运行配置白名单（凭据仍然禁止读取）
+    ALLOWED_ENV_KEYS = {
+        "OPENAI_BASE_URL", "OPENAI_BASE",
+        "DEFAULT_MODEL"
+    }
+
     @classmethod
     def audit(cls, code: str) -> Tuple[bool, str]:
         """
@@ -102,16 +108,24 @@ class CodeSecurityAuditor:
                         # 检测 os.getenv("OPENAI_API_KEY")
                         if mod_name == "os" and attr_name == "getenv":
                             if node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
-                                arg_val = node.args[0].value.upper()
+                                env_key = node.args[0].value
+                                # 白名单检查：允许读取 AI 业务必需的环境变量
+                                if env_key in cls.ALLOWED_ENV_KEYS:
+                                    continue
+                                arg_val = env_key.upper()
                                 if any(pat in arg_val for pat in cls.SENSITIVE_KEY_PATTERNS):
-                                    return False, f"安全边界策略拦截：禁止在沙箱代码中直接读取系统凭据【{node.args[0].value}】"
+                                    return False, f"安全边界策略拦截：禁止在沙箱代码中直接读取系统凭据【{env_key}】"
                     # 检测 os.environ.get("OPENAI_API_KEY")
                     elif isinstance(node.func.value, ast.Attribute) and isinstance(node.func.value.value, ast.Name):
                         if node.func.value.value.id == "os" and node.func.value.attr == "environ" and attr_name == "get":
                             if node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
-                                arg_val = node.args[0].value.upper()
+                                env_key = node.args[0].value
+                                # 白名单检查：允许读取 AI 业务必需的环境变量
+                                if env_key in cls.ALLOWED_ENV_KEYS:
+                                    continue
+                                arg_val = env_key.upper()
                                 if any(pat in arg_val for pat in cls.SENSITIVE_KEY_PATTERNS):
-                                    return False, f"安全边界策略拦截：禁止在沙箱代码中直接读取系统凭据【{node.args[0].value}】"
+                                    return False, f"安全边界策略拦截：禁止在沙箱代码中直接读取系统凭据【{env_key}】"
 
             # 4. 检测敏感内部属性访问 (防沙箱逃逸)
             elif isinstance(node, ast.Attribute):
@@ -124,9 +138,13 @@ class CodeSecurityAuditor:
                     if node.value.value.id == "os" and node.value.attr == "environ":
                         slice_node = node.slice
                         if isinstance(slice_node, ast.Constant) and isinstance(slice_node.value, str):
-                            key_val = slice_node.value.upper()
+                            env_key = slice_node.value
+                            # 白名单检查：允许读取 AI 业务必需的环境变量
+                            if env_key in cls.ALLOWED_ENV_KEYS:
+                                continue
+                            key_val = env_key.upper()
                             if any(pat in key_val for pat in cls.SENSITIVE_KEY_PATTERNS):
-                                return False, f"安全边界策略拦截：禁止在沙箱代码中直接读取系统凭据【{slice_node.value}】"
+                                return False, f"安全边界策略拦截：禁止在沙箱代码中直接读取系统凭据【{env_key}】"
 
         return True, ""
 

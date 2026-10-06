@@ -1580,7 +1580,7 @@ body.dark-workbench {
   position: relative;
 }
 
-/* 左侧路线图面板 */
+/* 左侧路线图面板（抽屉内嵌时宽度由抽屉统一控制） */
 .wb-sidebar {
   width: 260px;
   min-width: 260px;
@@ -1597,6 +1597,130 @@ body.dark-workbench {
   min-width: 0 !important;
   border-right: none;
   visibility: hidden;
+}
+
+/* ===== 左侧抽屉：关卡列表与指导书上下堆叠交替展示 ===== */
+.wb-drawer {
+  display: flex;
+  flex-direction: column;
+  /* 宽度由 App 内联控制（支持手动拖拽），这里只兜底最小可用宽度 */
+  min-width: 240px;
+  background: var(--wb-bg-panel);
+  border-right: 1px solid var(--wb-border-subtle);
+  overflow: hidden;
+  transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.wb-drawer.collapsed {
+  width: 0 !important;
+  min-width: 0 !important;
+  border-right: none;
+  visibility: hidden;
+}
+
+/* 抽屉内的折叠把手（点击标题行即可展开/收起该区块） */
+.wb-drawer-handle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--wb-bg-header);
+  border-bottom: 1px solid var(--wb-border-subtle);
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: var(--wb-text-sub);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.wb-drawer-handle:hover {
+  background: var(--wb-bg-hover, rgba(255, 255, 255, 0.06));
+  color: var(--wb-text-bright);
+}
+
+.wb-drawer-handle .wb-drawer-count {
+  font-size: 10px;
+  font-family: var(--wb-font-mono);
+  color: var(--wb-text-dim);
+  background: var(--wb-bg-subtle);
+  border: 1px solid var(--wb-border-subtle);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+/* 抽屉内的可伸缩内容体 */
+.wb-drawer-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.wb-drawer-body > * {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border-right: none !important;
+}
+
+.wb-drawer-body.collapsed {
+  display: none;
+}
+
+/* 抽屉内嵌的两个子面板不再各自撑开宽度，统一交给抽屉控制 */
+.wb-drawer .wb-sidebar,
+.wb-drawer .wb-guide-pane {
+  width: 100% !important;
+  min-width: 0 !important;
+  border-right: none;
+  transition: none;
+}
+
+/* 手动左右拖拽的宽度调节手柄 */
+.wb-resize-handle {
+  width: 5px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  position: relative;
+  z-index: 20;
+  transition: background 0.15s ease;
+}
+
+.wb-resize-handle:hover,
+.wb-resize-handle.dragging {
+  background: var(--wb-accent-primary, #60a5fa);
+}
+
+/* 拖拽期间禁止选中文本与面板过渡动画，避免抖动 */
+body.wb-resizing,
+body.wb-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+body.wb-resizing .wb-drawer {
+  transition: none !important;
+}
+
+/* 打印/导出 PDF 讲义时，隐藏交互元素，只保留纯讲义版面 */
+@media print {
+  .wb-body > .wb-drawer,
+  .wb-body > .wb-resize-handle,
+  .wb-guide-pane > div:first-child,
+  .wb-console-pane {
+    display: none !important;
+  }
+  .wb-layout, .wb-body { display: block !important; height: auto !important; overflow: visible !important; }
+  .wb-guide-pane, .wb-drawer {
+    width: 100% !important; min-width: 0 !important;
+    border: none !important; visibility: visible !important;
+  }
+  .wb-drawer-body { display: flex !important; }
+  .wb-drawer-body > div { overflow: visible !important; }
 }
 
 /* 中间指导书面板 */

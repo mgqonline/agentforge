@@ -17,6 +17,7 @@ export default function MissionGuide({
   activeCodeFile = null,
   onSelectCodeFile = () => {},
   onToggleCollapse = () => {},
+  showHandle = true,
   onLoadStarterCode = () => {}
 }) {
   const [activeTab, setActiveTab] = useState('mission'); // 'mission' | 'doc'
@@ -882,14 +883,16 @@ export default function MissionGuide({
             </button>
           )}
 
-          <button
-            onClick={onToggleCollapse}
-            className="wb-icon-btn"
-            style={{ width: '26px', height: '24px', borderRadius: '4px' }}
-            title="收起面板：收起指导书面板，进入代码全屏专注模式"
-          >
-            <ChevronLeft size={14} />
-          </button>
+          {showHandle && (
+            <button
+              onClick={onToggleCollapse}
+              className="wb-icon-btn"
+              style={{ width: '26px', height: '24px', borderRadius: '4px' }}
+              title="收起面板：收起指导书区块，把纵向空间让给关卡列表"
+            >
+              <ChevronLeft size={14} />
+            </button>
+          )}
         </div>
       </div>
 

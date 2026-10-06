@@ -245,10 +245,10 @@ def run_smoke_tests() -> None:
     cmd = [sys.executable, "-m", "pytest", str(smoke_test_script), "-v"]
     try:
         subprocess.run(cmd, check=True)
-    except Exception as e:
-        # 如果当前环境没有 pytest，回退使用 python 直接运行
-        fallback_cmd = [sys.executable, str(smoke_test_script)]
-        subprocess.run(fallback_cmd)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        # 如果当前环境没有 pytest，回退使用 unittest 直接运行；失败时继续向上抛出，避免 CI 误判成功。
+        fallback_cmd = [sys.executable, str(smoke_test_script), "-v"]
+        subprocess.run(fallback_cmd, check=True)
 
 
 def main() -> None:

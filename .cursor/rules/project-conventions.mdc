@@ -1,0 +1,14 @@
+---
+description: AgentForge 项目通用约定（回复语言、沟通风格、改动纪律）
+alwaysApply: true
+---
+
+# AgentForge 项目通用约定
+
+## 4. 本项目背景
+
+- 这是一个 **AI 技术类学习型系统**，不是通用企业级 Agent 平台。
+  - 评估功能时以「是否提升学习效果」为准绳，而不是以「自动化程度高低」为准绳。
+  - 导师 Agent 被刻意限制为苏格拉底式启发，不直接给答案；不要把它当成能力缺陷去"修复"。
+- 后端为 FastAPI（`backend/main.py` 等），唯一标准前端为 `frontend-react/`。
+- 课程关卡位于 `01-*` ~ `26-*` 目录，由 `backend/curriculum_engine.py` 加载。

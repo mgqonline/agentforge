@@ -13,7 +13,7 @@
 | **2. 工具链与 DX** | **95%** | 一键启动脚本 `start_services.sh` | 交付官方 CLI 工具 `scripts/agentforge_cli.py` (doctor/run/test/poc) | 发布为 PyPI 全局命令 `agentforge` |
 | **3. 生产打包部署** | **95%** | 原有基础开发版 docker-compose | 交付企业生产版 `docker-compose.prod.yml` 与运维 SOP 指南 | 编写 K8s / Helm Chart 编排模板 |
 | **4. 质量与测试** | **95%** | 单章节集成测试用例 | 交付 `tests/test_e2e_smoke.py` (9项全绿) + GitHub Actions CI 流水线 | 接入自动化压测与 Ragas 真实性基准评测 |
-| **5. 前后端融合** | **85%** | React 18 终端、Monaco 代码沙箱、SSE 打字机 | 标准化 OpenAPI 3.0 规范 `docs/OPENAPI_SPEC.json` | 彻底归档旧版 Vanilla JS 前端目录 |
+| **5. 前后端融合** | **90%** | `frontend-react` React 工作台、Monaco 代码沙箱、SSE 打字机 | 标准化 OpenAPI 3.0 规范 `docs/OPENAPI_SPEC.json`，React 前端已收敛为唯一标准入口 | 补充真实浏览器回归与前端性能基准 |
 | **6. 安全与企业合规** | **95%** | AST 语法树审查、HITL 人机审批中断点 | 多租户 JWT/RBAC、滑动窗口限流 (`auth_governance.py`) + 安全沙箱 (`security_sandbox.py`) | 接入外部 E2B MicroVM 硬件级隔离 |
 
 ---
@@ -25,8 +25,8 @@
 - [x] **任务 1.1**：编写官方 CLI 工具 (`scripts/agentforge_cli.py`)，支持一键 `doctor` 体检、`run <chapter>`、`test` 冒烟自检。
 - [x] **任务 1.2**：交付生产级一键全栈容器编排清单 (`docker-compose.prod.yml`)，覆盖 Postgres、Redis、FastAPI 网关与 Celery Worker。
 - [x] **任务 1.3**：编写全局全栈冒烟测试套件 (`tests/test_e2e_smoke.py`)，实现零依赖 0.5 秒极速确定性校验。
-- [ ] **任务 1.4**：清理并收敛前端代码库，将 `frontend-react` 设为唯一标准 Web UI，归档旧版 `frontend/`。
-- [ ] **任务 1.5**：采用 `uv` 或 `poetry` 生成全局唯一的锁版本依赖文件 (`uv.lock`)，消除跨机器 pip 安装时的子依赖冲突。
+- [x] **任务 1.4**：清理并收敛前端代码库，将 `frontend-react` 设为唯一标准 Web UI，移除旧版 `frontend/` 及其 Vanilla 静态兼容资源。
+- [x] **任务 1.5**：采用 `uv` 生成全局 Python 依赖锁定文件 `uv.lock`，消除跨机器安装时的子依赖漂移。
 
 ---
 
