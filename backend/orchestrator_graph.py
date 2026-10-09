@@ -15,6 +15,7 @@ from examples.mysql_agent import build_mysql_agent
 from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, RemoveMessage
 from langgraph.graph.message import add_messages
 from dfl_engine import dfl_feedback
+from model_router import model_failover_router
 
 class OrchestratorState(TypedDict):
     input_task: str
@@ -381,7 +382,7 @@ def build_expert_graph(
 
                 openai_msgs.append(msg_dict)
 
-        stream = await client.chat.completions.create(
+        stream = await model_failover_router.chat_completion(
             model=selected_model,
             messages=openai_msgs,
             tools=OPENAI_TOOL_SCHEMAS,

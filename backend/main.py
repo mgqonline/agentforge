@@ -113,9 +113,9 @@ async def check_prompt_injection(text: str) -> bool:
             return True
     return False
 
-model_name = os.getenv("MODEL_NAME", "deepseek-v4-pro")
-api_key = os.getenv("OPENAI_API_KEY", "dummy")
-base_url = os.getenv("OPENAI_API_BASE", "https://api.deepseek.com/v1")
+model_name = os.getenv("PRIMARY_MODEL", os.getenv("MODEL_NAME", "deepseek-v4-1-flash"))
+api_key = os.getenv("PRIMARY_API_KEY") or os.getenv("OPENAI_API_KEY", "dummy")
+base_url = os.getenv("PRIMARY_API_BASE") or os.getenv("OPENAI_API_BASE", "https://llm.talkweb.com.cn/v1")
 
 client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
 
@@ -1377,8 +1377,8 @@ async def api_mentor_review(
         ])
     ) or ("排查" in user_query or "诊断" in user_query or "报错" in user_query or "未通过" in user_query)
 
-    api_key = os.getenv("OPENAI_API_KEY")
-    base_url = os.getenv("OPENAI_BASE_URL", "https://api.deepseek.com")
+    api_key = os.getenv("PRIMARY_API_KEY") or os.getenv("OPENAI_API_KEY")
+    base_url = os.getenv("PRIMARY_API_BASE") or os.getenv("OPENAI_BASE_URL") or os.getenv("OPENAI_API_BASE", "https://llm.talkweb.com.cn/v1")
     
     review_markdown = ""
     score = 68 if is_error_diagnostic else 88
@@ -1468,8 +1468,8 @@ async def api_mentor_review(
 ### 5. 🛡️ 工业级落地避坑指南
 """
 
-            resp = await client.chat.completions.create(
-                model=os.getenv("DEFAULT_MODEL", "deepseek-chat"),
+            resp = await model_failover_router.chat_completion(
+                model=os.getenv("PRIMARY_MODEL", os.getenv("DEFAULT_MODEL", "deepseek-v4-1-flash")),
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
@@ -1573,8 +1573,8 @@ async def api_mentor_review_stream(
     if tb_matches:
         suspicious_lines = list(set([int(m) for m in tb_matches]))
 
-    api_key = os.getenv("OPENAI_API_KEY")
-    base_url = os.getenv("OPENAI_BASE_URL", "https://api.deepseek.com")
+    api_key = os.getenv("PRIMARY_API_KEY") or os.getenv("OPENAI_API_KEY")
+    base_url = os.getenv("PRIMARY_API_BASE") or os.getenv("OPENAI_BASE_URL") or os.getenv("OPENAI_API_BASE", "https://llm.talkweb.com.cn/v1")
 
     selected_code_snippet = (req.selected_code or "").strip()
     selected_code_section = f"""
@@ -1721,8 +1721,8 @@ async def api_mentor_review_stream(
 
                 messages.append({"role": "user", "content": user_content})
 
-                stream = await client.chat.completions.create(
-                    model=os.getenv("DEFAULT_MODEL", "deepseek-chat"),
+                stream = await model_failover_router.chat_completion(
+                    model=os.getenv("PRIMARY_MODEL", os.getenv("DEFAULT_MODEL", "deepseek-v4-1-flash")),
                     messages=messages,
                     max_tokens=1800,
                     temperature=0.3,

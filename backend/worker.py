@@ -14,6 +14,8 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langsmith import traceable, trace
 from langsmith.run_helpers import get_current_run_tree
 from tools import OPENAI_TOOL_SCHEMAS, execute_tool_call
+from model_router import model_failover_router
+vision_model_failover_router = model_failover_router
 from agent_policy import evaluate_approval_decision, evaluate_task_policy
 from agent_governance import (
     complete_approval,
@@ -213,7 +215,7 @@ async def review_ocr_with_vision_model(client, image_data: str, extracted_text: 
     )
     try:
         response = await asyncio.wait_for(
-            vision_client.chat.completions.create(
+            vision_model_failover_router.chat_completion(
                 model=vision_model,
                 messages=[{
                     "role": "user",
@@ -235,7 +237,7 @@ async def review_ocr_with_vision_model(client, image_data: str, extracted_text: 
             try:
                 print(f"[OCR] DeepSeek-OCR-2 专属端点不可用: {review_error}，正在自动平滑回退至通用视觉模型 {fallback_model}...")
                 fallback_resp = await asyncio.wait_for(
-                    vision_client.chat.completions.create(
+                    vision_model_failover_router.chat_completion(
                         model=fallback_model,
                         messages=[{
                             "role": "user",
@@ -317,8 +319,8 @@ def publish_to_ws(session_id: str, data: dict):
 
 def select_model_by_task(requested_model: str, mode: str, has_complex_input: bool = False) -> str:
     """根据任务类型在 deepseek-v4-flash (极速) 与 deepseek-v4-pro (深度) 之间自动路由"""
-    flash_model = os.getenv("MODEL_FLASH", "deepseek-v4-flash")
-    pro_model = os.getenv("MODEL_PRO", "deepseek-v4-pro")
+    flash_model = os.getenv("MODEL_FLASH", os.getenv("PRIMARY_MODEL", "deepseek-v4-1-flash"))
+    pro_model = os.getenv("MODEL_PRO", os.getenv("PRIMARY_MODEL", "deepseek-v4-1-flash"))
     
     # 客户端显式指定了具体版本时优先尊重显式传递
     if requested_model and requested_model not in {"auto", "default", "deepseek-chat"}:
@@ -372,8 +374,8 @@ async def async_process_request(
     db_url = os.getenv("ASYNC_DATABASE_URL") or os.getenv("DATABASE_URL")
     if not db_url:
         raise RuntimeError("ASYNC_DATABASE_URL or DATABASE_URL must be configured")
-    api_key = os.getenv("OPENAI_API_KEY", "dummy")
-    base_url = os.getenv("OPENAI_API_BASE", "https://api.deepseek.com/v1")
+    api_key = os.getenv("PRIMARY_API_KEY") or os.getenv("OPENAI_API_KEY", "dummy")
+    base_url = os.getenv("PRIMARY_API_BASE") or os.getenv("OPENAI_API_BASE", "https://llm.talkweb.com.cn/v1")
     client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
 
     
@@ -572,7 +574,7 @@ async def async_process_request(
                                 "2. 高级文案赋能：将其深度重构为逻辑清晰、辞藻传神、极易于内部展示或对外运营的高质生产力【专属商务/新媒体文案】；\n"
                                 "3. 要点归结：结尾运用 Markdown 小标签提列【✨ 核心主线与金句大纲】，使文案立刻拥有商业实操和再传播价值！"
                             )
-                            stream = await client.chat.completions.create(
+                            stream = await model_failover_router.chat_completion(
                                 model=selected_model,
                                 messages=[
                                     {"role": "system", "content": "你是首席商务通信总监与顶级文案金牌编剧。"},
@@ -875,7 +877,7 @@ async def async_process_request(
             await ws_send({"type": "stream_start"})
             try:
                 stream = await asyncio.wait_for(
-                    client.chat.completions.create(
+                    model_failover_router.chat_completion(
                         model=selected_model,
                         messages=fast_messages,
                         stream=True,

@@ -97,11 +97,11 @@ class ModelFailoverRouter:
 
     def _load_from_env(self):
         """从环境变量加载主线路与备用线路"""
-        # 1. 主线路 (Primary)
-        primary_key = os.getenv("OPENAI_API_KEY", "dummy")
-        primary_base = os.getenv("OPENAI_API_BASE", "https://api.deepseek.com/v1")
-        primary_model = os.getenv("MODEL_NAME", "deepseek-chat")
-        primary_name = os.getenv("PRIMARY_PROVIDER_NAME", "DeepSeek 官方生产主干道")
+        # 1. 主线路：拓维 LLM 网关；密钥只从环境变量读取，不写入源码或配置模板。
+        primary_key = os.getenv("PRIMARY_API_KEY") or os.getenv("OPENAI_API_KEY", "dummy")
+        primary_base = os.getenv("PRIMARY_API_BASE", "https://llm.talkweb.com.cn/v1")
+        primary_model = os.getenv("PRIMARY_MODEL", os.getenv("MODEL_NAME", "deepseek-v4-1-flash"))
+        primary_name = os.getenv("PRIMARY_PROVIDER_NAME", "拓维 LLM 主线路")
 
         self.providers.append(
             ProviderNode(
@@ -117,13 +117,17 @@ class ModelFailoverRouter:
             )
         )
 
-        # 2. 备用线路 1 (Secondary: 如阿里云百炼 / 硅基流动 / 备用中转)
-        fallback_key = os.getenv("FALLBACK_API_KEY")
-        fallback_base = os.getenv("FALLBACK_API_BASE")
+        # 2. 备用线路：DeepSeek 官方接口（保留原有 OPENAI_API_KEY 作为兼容配置）。
+        fallback_key = (
+            os.getenv("FALLBACK_API_KEY")
+            or os.getenv("DEEPSEEK_API_KEY")
+            or os.getenv("OPENAI_API_KEY")
+        )
+        fallback_base = os.getenv("FALLBACK_API_BASE", "https://api.deepseek.com/v1")
         fallback_model = os.getenv("FALLBACK_MODEL_NAME", "deepseek-chat")
-        fallback_name = os.getenv("FALLBACK_PROVIDER_NAME", "企业备用高可用线路 (阿里云百炼/硅基流动)")
+        fallback_name = os.getenv("FALLBACK_PROVIDER_NAME", "DeepSeek 官方备用线路")
 
-        if fallback_key and fallback_base:
+        if fallback_key:
             self.providers.append(
                 ProviderNode(
                     id="provider_fallback_1",
@@ -199,6 +203,7 @@ class ModelFailoverRouter:
     async def chat_completion(
         self,
         messages: List[Dict[str, Any]],
+        model: Optional[str] = None,
         stream: bool = False,
         temperature: float = 0.7,
         max_retries_per_node: int = 2,
@@ -231,7 +236,7 @@ class ModelFailoverRouter:
                         node.total_fallovers += 1
 
                     res = await client.chat.completions.create(
-                        model=node.model_name,
+                        model=node.model_name if not model or model in {"auto", "default"} else model,
                         messages=messages,
                         stream=stream,
                         temperature=temperature,

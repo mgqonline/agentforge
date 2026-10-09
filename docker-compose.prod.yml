@@ -70,6 +70,12 @@ services:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-agentforge_user}:${POSTGRES_PASSWORD:-agentforge_secret_2026}@postgres:5432/${POSTGRES_DB:-agentforge_db}
       - REDIS_URL=redis://redis:6379/0
       - ALLOWED_ORIGINS=*
+      - PRIMARY_API_BASE=${PRIMARY_API_BASE:-https://llm.talkweb.com.cn/v1}
+      - PRIMARY_MODEL=${PRIMARY_MODEL:-deepseek-v4-1-flash}
+      - FALLBACK_API_BASE=${FALLBACK_API_BASE:-https://api.deepseek.com/v1}
+      - FALLBACK_MODEL_NAME=${FALLBACK_MODEL_NAME:-deepseek-chat}
+      - OPENAI_BASE_URL=${PRIMARY_API_BASE:-https://llm.talkweb.com.cn/v1}
+      - OPENAI_API_BASE=${PRIMARY_API_BASE:-https://llm.talkweb.com.cn/v1}
     volumes:
       - ./chroma_db:/app/backend/chroma_db
       - ./logs:/app/backend/logs
@@ -101,6 +107,10 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-agentforge_user}:${POSTGRES_PASSWORD:-agentforge_secret_2026}@postgres:5432/${POSTGRES_DB:-agentforge_db}
       - REDIS_URL=redis://redis:6379/0
+      - PRIMARY_API_BASE=${PRIMARY_API_BASE:-https://llm.talkweb.com.cn/v1}
+      - PRIMARY_MODEL=${PRIMARY_MODEL:-deepseek-v4-1-flash}
+      - FALLBACK_API_BASE=${FALLBACK_API_BASE:-https://api.deepseek.com/v1}
+      - FALLBACK_MODEL_NAME=${FALLBACK_MODEL_NAME:-deepseek-chat}
     networks:
       - agentforge_net
     depends_on:
