@@ -73,6 +73,14 @@ async def recognize_face(file: UploadFile = File(...)):
     except ValueError as e:
         # DeepFace 在 enforce_detection=True 且 YOLO 未发现人脸时会抛出 ValueError
         return JSONResponse(status_code=400, content={"status": "error", "message": "❌ YOLO 未在图中检测到任何人体面部！"})
+    except HTTPException:
+        # ⚠️ 必须让 HTTPException 原样冒泡出去。
+        # 上面那段 `raise HTTPException(status_code=400, ...)` 是写在同一个 try 里的，
+        # 如果这里不单独放行，它会被下面的 `except Exception` 兜住并降级成 500，
+        # 于是「非法图片」明明是客户端错误，却变成了服务端内部错误。
+        raise
+    except HTTPException:
+        raise
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 

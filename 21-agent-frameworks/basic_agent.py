@@ -30,17 +30,29 @@ class AgentState(TypedDict):
     # messages 序列会自动把新消息 append 进去 (依赖 operator.add)
     messages: Annotated[List[BaseMessage], operator.add]
 
-# 3. 初始化带有工具调用的 LLM
-# 注意：你需要事先在终端或 .env 中设置 OPENAI_API_KEY 和 OPENAI_API_BASE
-model_name = os.getenv("MODEL_NAME", "deepseek-v4-pro") # 读取环境变量，默认回退到 DeepSeek
-llm = ChatOpenAI(model=model_name, temperature=0)
-llm_with_tools = llm.bind_tools(tools)
+# 3. LLM 工厂（关键工程约束：绝不在模块顶层实例化模型）
+# ------------------------------------------------------------------
+# ChatOpenAI 在 __init__ 阶段就会校验鉴权并尝试建立 openai 客户端，
+# 一旦模块顶层缺少 OPENAI_API_KEY，import 阶段直接抛 OpenAIError：
+# 这样连"只测工具函数/只测路由分支"这种完全不碰大模型的单元测试都跑不起来。
+# 因此统一改为惰性构造，既符合本课程"大模型调用必须可被隔离评测"的工程约定，
+# 也避免了在导入期就把真实网络客户端准备好。
+_MODEL_NAME = os.getenv("MODEL_NAME", "deepseek-v4-pro")  # 读取环境变量，默认回退到 DeepSeek
+_llm_with_tools = None
+
+def get_llm_with_tools():
+    """惰性获取绑定了工具的 LLM 实例（首次调用时才真正读取凭据并建连）"""
+    global _llm_with_tools
+    if _llm_with_tools is None:
+        llm = ChatOpenAI(model=_MODEL_NAME, temperature=0)
+        _llm_with_tools = llm.bind_tools(tools)
+    return _llm_with_tools
 
 # 4. 定义节点函数 (Nodes)
 def agent_node(state: AgentState):
     """节点：大模型进行思考和决策"""
     print("🤖 [Agent 节点] 大模型正在思考...")
-    response = llm_with_tools.invoke(state["messages"])
+    response = get_llm_with_tools().invoke(state["messages"])
     return {"messages": [response]}
 
 def tool_node(state: AgentState):

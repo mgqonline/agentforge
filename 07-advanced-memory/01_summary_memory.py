@@ -21,10 +21,19 @@ class SummaryState(TypedDict):
     summary: str
 
 # 3. 节点逻辑
+#
+# 【关键工程约束】模型实例必须惰性构造，绝不可放在模块顶层。
+# ChatOpenAI 在 __init__ 阶段就会校验鉴权并建立 openai 客户端，若模块顶层缺少
+# OPENAI_API_KEY，import 阶段就会抛 OpenAIError，导致任何单元测试都无法运行。
+_MODEL_NAME = "deepseek-chat"  # 记忆摘要属于高频次调用，选择便宜快速的模型
+
+def _build_model():
+    """惰性构造对话模型（首次调用节点时才读取凭据并建连）"""
+    return ChatOpenAI(model_name=_MODEL_NAME, temperature=0)
 
 def call_model(state: SummaryState):
     """大脑节点：根据摘要和新消息进行回复。"""
-    model = ChatOpenAI(model_name="deepseek-chat", temperature=0)
+    model = _build_model()
     
     # 获取之前的摘要
     summary = state.get("summary", "")
@@ -44,7 +53,7 @@ def summarize_conversation(state: SummaryState):
     # 设定一个阈值：当消息超过 6 条时开始摘要
     if len(state["messages"]) > 6:
         print("📝 [系统]: 对话过长，正在生成摘要以节省 Token...")
-        model = ChatOpenAI(model_name="deepseek-chat", temperature=0)
+        model = _build_model()
         
         # 将现有摘要和所有消息发给模型生成新摘要
         summary = state.get("summary", "")

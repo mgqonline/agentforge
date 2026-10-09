@@ -1,6 +1,38 @@
+import json
 import os
 import re
 from typing import List, Dict, Any, Optional
+
+# =====================================================================
+# 阶段补充题库（外部 JSON 数据文件）
+# =====================================================================
+# 为什么放在外部 JSON、而不是继续塞进下面的 CHALLENGE_METADATA 字典：
+# 字典里每个 test_code 都是嵌在三引号字面量中的 Python 源码，源码再出现
+# docstring 就得手工逐层转义；一旦少转义一次，整个模块直接 SyntaxError，
+# 而且只在服务启动时才暴露。JSON 只需转义双引号，工具链成熟、diff 可读，
+# 无法破坏本模块的语法。数据文件缺失或损坏时静默降级为空字典，不影响启动。
+
+
+def _load_supplemental_challenges() -> Dict[str, Dict[str, str]]:
+    """读取 backend/challenge_tests.json（阶段四补齐的真实评测套件）。"""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "challenge_tests.json")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        challenges = data.get("challenges") or {}
+        return {
+            str(pid): {
+                k: v for k, v in entry.items()
+                if k in ("test_code", "solution_code", "starter_code")
+            }
+            for pid, entry in challenges.items()
+            if isinstance(entry, dict)
+        }
+    except Exception:
+        return {}
+
+
+SUPPLEMENTAL_CHALLENGES = _load_supplemental_challenges()
 
 CHALLENGE_METADATA = {
     "01-prompt-engineering": {
@@ -1260,6 +1292,24 @@ if __name__ == '__main__':
 }
 
 # =====================================================================
+# 合并阶段四补充题库
+# =====================================================================
+# 规则：
+#   * 补充条目若已在 CHALLENGE_METADATA 中存在，则按字段「补齐/覆盖」——
+#     真实评测套件必须优先于历史占位内容；
+#   * 08-multimodal 等原本没有预设有测试的关卡，则新建一条最小条目，
+#     只携带 test_code（+ 可选 solution_code）。这样 `predefined` 判定为真，
+#     于是引擎不再生成 119 字符的占位测试，同时也不会污染其它字段——
+#     因为 mission/requirements 等仍走 `_generate_default_mission` 的兜底路径，
+#     而 solution_code 只在显式提供时才覆盖磁盘源码（见 get_phase_detail 分支）。
+for _phase_id, _entry in SUPPLEMENTAL_CHALLENGES.items():
+    _existing = CHALLENGE_METADATA.get(_phase_id)
+    if _existing is None:
+        CHALLENGE_METADATA[_phase_id] = dict(_entry)
+    else:
+        _existing.update(_entry)
+
+# =====================================================================
 # 企业级 AI 课程体系：初、中、高级由浅入深逻辑排序与前置拓扑映射
 # =====================================================================
 
@@ -1512,14 +1562,19 @@ class CurriculumEngine:
         # 3. 检查是否有预设的高质量闯关元数据
         predefined = CHALLENGE_METADATA.get(phase_id)
         if predefined:
-            mission = {
-                "mission_title": predefined["mission_title"],
-                "mission_goal": predefined["mission_goal"],
-                "requirements": predefined["requirements"],
-                "learning_steps": predefined["learning_steps"],
-                "acceptance_criteria": predefined["acceptance_criteria"],
-                "hint": predefined.get("hint", "")
-            }
+            # 补充题库里的条目可能只带 test_code（不自带 mission 文案），
+            # 此时任务描述仍走兜底生成，避免 KeyError 让整个关卡加载失败。
+            if predefined.get("mission_title"):
+                mission = {
+                    "mission_title": predefined["mission_title"],
+                    "mission_goal": predefined["mission_goal"],
+                    "requirements": predefined["requirements"],
+                    "learning_steps": predefined["learning_steps"],
+                    "acceptance_criteria": predefined["acceptance_criteria"],
+                    "hint": predefined.get("hint", "")
+                }
+            else:
+                mission = self._generate_default_mission(phase_id, title, "企业级 AI 实战")
             if predefined.get("starter_code"):
                 starter_code = predefined["starter_code"]
             if predefined.get("test_code"):
@@ -1608,6 +1663,51 @@ class CurriculumEngine:
             solution_code = starter_code
             solution_source = f"{phase_id}/starter.py"
             solution_doc = "官方脚手架代码"
+
+        # 4.1 追加本阶段内被主源码 `import` 引用的兄弟模块
+        # ------------------------------------------------------------------
+        # 有些关卡把工程拆成了多个文件，例如 14-celery-advanced 的
+        # `celery_app.py`（只声明 Celery 实例）+ `tasks.py`（真正用 @app.task
+        # 定义任务）。兜底逻辑 `py_files[0]` 只按文件名排序取了第一个，于是
+        # tasks.py 里的任务定义完全不会被加载 —— 结果就是「官方参考解根本不含
+        # 这些任务」，测试断言必然失败，学员照抄也过不了关。
+        #
+        # 但绝不能无脑追加所有兄弟模块：像 09-evaluation 的
+        # `02_real_ragas.py`、19-model-finetuning 的 `unsloth_finetune.py` 都属于
+        # 「另一个独立可运行示例」，它们自己会 import 未安装的重型依赖
+        # （datasets / unsloth），盲目拼接会让原本正常的关卡直接 ImportError。
+        # 因此这里只按需追加：确实是本阶段内被主源码 import 的那个模块。
+        support_modules = []
+        is_predefined_solution = bool(predefined and (predefined.get("solution_code") or predefined.get("starter_code")))
+        if not is_predefined_solution and len(py_files) > 1:
+            main_module = os.path.splitext(os.path.basename(py_files[0][0]))[0]
+            main_imports = set(re.findall(r"^\s*(?:from|import)\s+([A-Za-z_][\w]*)", solution_code, re.MULTILINE))
+            for rel_path, full_path in py_files[1:]:
+                module_name = os.path.splitext(os.path.basename(rel_path))[0]
+                try:
+                    with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
+                        sibling_source = f.read()
+                except Exception:
+                    continue
+                sibling_imports = set(
+                    re.findall(r"^\s*(?:from|import)\s+([A-Za-z_][\w]*)", sibling_source, re.MULTILINE)
+                )
+                # 双向判定：主源码 import 了兄弟模块（主 → 从），
+                # 或者兄弟模块 import 了主源码（从 → 主，如 tasks.py 里 `from celery_app import app`）。
+                # 只有存在这种真实工程耦合时才拼接；像 02_real_ragas.py、unsloth_finetune.py
+                # 这类「互不相干的独立示例」不会被拼进来，避免引入 datasets/unsloth 等未装依赖。
+                if module_name in main_imports or main_module in sibling_imports:
+                    support_modules.append((rel_path, sibling_source))
+            if support_modules:
+                extra_code = "\n\n".join(
+                    f"# --- [同阶段依赖模块] {rel} ---\n{content}"
+                    for rel, content in support_modules
+                )
+                solution_code = f"{solution_code}\n\n{extra_code}"
+                solution_doc = (
+                    f"来自生产级真实模块文件 {py_files[0][0]}（并自动串联被其 import 的依赖模块 "
+                    f"{'、'.join(rel for rel, _ in support_modules)}），代表本阶段的最佳实践形态。"
+                )
 
         # 5. 提取任务 Checklist
         checklist = []

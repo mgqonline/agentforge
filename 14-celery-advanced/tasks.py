@@ -1,7 +1,49 @@
 import time
 import random
-from celery_app import app
 from celery import chord, chain
+
+# 兼容两种运行形态：
+#   1. 正常工程形态：与 celery_app.py 同目录，直接复用其中配置好的实例；
+#   2. 单文件交付/沙箱评测形态：没有 celery_app.py 时，就地兜底创建一个
+#      **与 celery_app.py 完全等价**的实例（含全部企业级配置），
+#      保证任务定义与安全策略均可被导入和单元测试，不会因为缺文件而 ImportError。
+_FALLBACK_CONF = {
+    "task_serializer": "json",
+    "accept_content": ["json"],
+    "result_serializer": "json",
+    "timezone": "Asia/Shanghai",
+    "enable_utc": True,
+    # 防止大模型 API 限流时一堆重试任务瞬间挤爆队列（并发风暴）
+    "task_annotations": {"tasks.generate_report": {"rate_limit": "10/m"}},
+    # 防止大模型生成时间过长卡死 Worker（软超时警告 / 硬超时强杀）
+    "task_soft_time_limit": 300,
+    "task_time_limit": 360,
+    # 定时任务：每天半夜同步知识库
+    "beat_schedule": {
+        "sync-knowledge-base-every-midnight": {
+            "task": "tasks.sync_vector_db",
+            "schedule": 86400.0,
+        },
+    },
+}
+
+try:
+    from celery_app import app  # type: ignore
+except ImportError:  # pragma: no cover - 取决于部署形态
+    from celery import Celery as _Celery
+
+    app = _Celery(
+        "ai_agent_tasks",
+        broker="redis://localhost:6379/0",
+        backend="redis://localhost:6379/1",
+    )
+    app.conf.update(**_FALLBACK_CONF)
+
+# 无论走哪条分支，都再显式套用一次企业级配置，保证最终实例的配置一定完整
+# （避免 celery_app.py 若未包含某项配置时出现「配置静默缺失」）
+for _key, _value in _FALLBACK_CONF.items():
+    if not app.conf.get(_key):
+        app.conf[_key] = _value
 
 # =====================================================================
 # 场景 1：基础耗时任务与 LLM 异常重试策略

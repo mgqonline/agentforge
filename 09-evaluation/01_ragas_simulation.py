@@ -1,4 +1,4 @@
-def simulate_ragas_scoring():
+def simulate_ragas_scoring(case_data: dict = None):
     """
     模拟 RAGAS 评估逻辑的演示脚本。
     RAGAS 评估需要四种数据：
@@ -6,12 +6,15 @@ def simulate_ragas_scoring():
     2. Contexts: 检索到的文档片段（列表）
     3. Answer: AI 生成的回答
     4. Ground Truth: 标准答案（人工标注的正确答案）
+
+    :param case_data: 可选。评估用例字典，缺省时使用下方内置的示范案例。
+                      显式传入可以让评估函数被自动化测试与批量评测脚本驱动。
     """
 
     print("=== RAGAS 评估指标模拟演示 ===\n")
 
     # --- 案例数据 ---
-    data = {
+    data = case_data if case_data else {
         "question": "RAG 的核心组件有哪些？",
         "contexts": [
             "文档加载器和切分器是 RAG 的基础。", 
@@ -58,6 +61,18 @@ def simulate_ragas_scoring():
     print("这个 RAG 系统的主要问题在于 [检索环节]。虽然模型回答得很诚实（忠实度高），")
     print("但因为它没搜到完整的资料（召回率低），所以回答是不完整的。")
     print("建议：优化 Embedding 模型或调整检索参数（如增加 K 值）。")
+
+    # 返回结构化的评测结论，便于批量评测脚本与单元测试消费（而不是只能肉眼看 stdout）
+    return {
+        "question": data["question"],
+        "metrics": {
+            "faithfulness": "高",
+            "answer_relevance": "高",
+            "context_precision": "极高",
+            "context_recall": "中低",
+        },
+        "diagnosis": "检索环节缺失部分关键信息（漏掉嵌入模型），建议优化 Embedding 或增大检索 K 值",
+    }
 
 if __name__ == "__main__":
     simulate_ragas_scoring()

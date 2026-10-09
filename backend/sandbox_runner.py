@@ -149,10 +149,152 @@ class CodeSecurityAuditor:
         return True, ""
 
 
+# 评测期「重型可选依赖」的注入模板（供 SandboxRunner.DEPENDENCY_STUB_PREAMBLE 使用）
+# ------------------------------------------------------------------------------
+# 模板里刻意只做两件事：把模块注册进 sys.modules、让任意属性访问都返回一个
+# 「可被调用但什么都不算」的惰性对象。它不生成任何伪造的识别结果，所以只能支撑
+# 「接口契约」类断言，无法把错误实现蒙混成正确实现。
+_DEPENDENCY_STUB_TEMPLATE = '''# --- 评测期重型依赖替身：仅当 {module}.{attr} 确实无法导入时生效 ---
+try:
+    import {module}  # noqa: F401
+    from {module} import {attr} as _probe_{module}  # noqa: F401
+except Exception:
+    import sys as _sys, types as _types
+
+    class _SandboxStubCallable:
+        """评测用惰性替身：可被任意调用，但不伪装任何真实计算结果。
+
+        这里刻意让「检索类」调用抛出 ValueError —— 因为真实的 DeepFace 在
+        enforce_detection=True 且检测不到人脸时正是抛 ValueError。如果替身改成
+        返回 None，参考解里紧随其后的 `len(dfs)` 会抛 TypeError 并被兜底成 500，
+        把一个「客户端图片没人脸」的正常业务分支误判成服务端崩溃。
+        让替身保持与真实库一致的失败姿态，评测才能反映真实语义。
+        """
+
+        def __init__(self, *a, **k):
+            pass
+
+        def __call__(self, *a, **k):
+            raise ValueError(
+                "沙箱替身：该依赖未真实安装，无法执行实际推理"
+                "（评测仅覆盖接口契约，不校验模型精度）"
+            )
+
+        def __getattr__(self, _name):
+            if _name == "find":
+                # `find` 是参考解唯一真实调用的入口：真实的 DeepFace 在
+                # enforce_detection=True 且图中无人脸时抛 ValueError。替身若同意返回
+                # 惰性对象，参考解会走到 `len(dfs) == 0` 分支，把「检测不到人脸」这个
+                # 应当 400 的输入静默当成「陌生人」返回 200，评测就失去区分能力。
+                return self._find_no_face
+
+            return _SandboxStubCallable()
+
+        def _find_no_face(self, *a, **k):
+            if k.get("enforce_detection", False):
+                raise ValueError(
+                    "沙箱替身：无人脸可检测 —— 与真实 DeepFace 在 "
+                    "enforce_detection=True 时保持一致的失败姿态"
+                )
+            return []
+
+        def __iter__(self):
+            return iter(())
+
+        def __len__(self):
+            return 0
+
+    class _SandboxStubModule(_types.ModuleType):
+        # 只暴露「探测时声明过的真实符号」，刻意不给模块加 catch-all 式的
+        # __getattr__。原因是在 macOS + 未安装 tf-keras 的环境里，一个把任意属性
+        # 都解析成对象的模块对象会在解释器退出阶段（文档字符串/警告收集器扫描
+        # sys.modules 时）触发 native 段错误，退出码 -11、测试虽然全 OK 却被判失败。
+        # 显式赋值既避开该崩溃，又更严格：只有参考解真正 import 的名字才可用。
+        pass
+
+    _stub_module = _SandboxStubModule('{module}')
+    _stub_module.{attr} = _SandboxStubCallable()
+    _sys.modules['{module}'] = _stub_module
+'''
+
+# 探测时必须连「子模块」一起导入
+# ------------------------------------------------------------------------------
+# 反例：`import deepface` 本身会成功（顶层包能加载），真正抛错的是它下面被
+# `__init__`/`DeepFace.py` 触发的 Keras 版本校验。如果只探测顶层包，就会误判
+# 「依赖可用」，替身不注入，随后参考解里的 `from deepface import DeepFace`
+# 仍然把整场评测打崩。因此每个模块都要声明「参考解真正会用到的那几个符号」，
+# 探测语句与真实用法保持一致。
+STUBBABLE_MODULES = (("deepface", ("DeepFace",)),)
+
+
 class SandboxRunner:
     """具备 AST 静态审查、凭证零泄露与资源配额的企业级代码沙箱执行器"""
 
     MAX_OUTPUT_BYTES = 64 * 1024  # 最大输出 64KB 防爆破
+
+    # ==========================================================
+    # 通关评测时的 __main__ 演示门控前缀
+    # ==========================================================
+    # [为什么需要它]
+    # `verify_code` 会把「学员代码」与「测试套件」拼接成同一个脚本执行。学员代码的
+    # 参考实现通常自带一段 `if __name__ == "__main__":` 演示（打印效果、调用真实
+    # 大模型、加载重量级依赖）。在拼接后的脚本里，`__name__` 同样是 "__main__"，
+    # 于是这段演示会抢在测试套件之前执行：
+    #   · 需要 API Key 的演示（ChatOpenAI / CrewAI）→ 抛 OpenAIError 直接中断；
+    #   · 需要未安装依赖的演示（crewai）→ ModuleNotFoundError 直接中断；
+    # 结果是「照抄官方答案也过不了关」，学员永远拿不到分数，而且报错信息与自己的
+    # 实现毫无关系。
+    #
+    # [机制]
+    # 三件事必须同时成立，因此门控分成「前缀屏蔽 + 套件内复位」两段：
+    #   1. 用户代码里的 `if __name__ == "__main__":` 演示必须在评测期**不执行**，
+    #      否则需要 API Key / 未安装重型依赖的演示会直接炸掉整场评测；
+    #   2. 测试套件的 `unittest.main()` 必须在**真正的 "__main__"** 身份下运行，
+    #      CPython 只有模块名是 "__main__" 时才把 stderr 交给 unittest 打印
+    #      "test_x ... ok / Ran N tests / OK" 用例明细；
+    #   3. 用户代码里依赖模块名的框架（典型如 Celery 用当前模块名做任务命名空间，
+    #      产出 `ai_agent_tasks.generate_report`）必须看到真实模块名。
+    #
+    # 关键：`__main__` 复位**必须发生在测试套件之前**。若放在脚本最末尾（套件之后），
+    # 那么 `unittest.main()` 执行时模块名仍是哨兵，一个字符都不会输出 —— 学员端
+    # 的「测试断言卡片」会全部退化成 unknown。
+    MAIN_GUARD_PREAMBLE = (
+        "# --- 评测门控：用户代码的 __main__ 演示在评测期不执行 ---\n"
+        "__real_main__ = __name__\n"
+        "__name__ = '__evaluation_sandbox__'\n"
+    )
+
+    # 测试套件前的门控复位：恢复真实模块名，让 unittest 明细与 Celery 命名空间均正常
+    MAIN_GUARD_EPILOGUE = (
+        "\n# --- 评测门控复位：测试套件以真正的 __main__ 身份运行 ---\n"
+        "__name__ = __real_main__\n\n"
+    )
+
+    # 评测期的「重型可选依赖替身」名单
+    # ------------------------------------------------------------------
+    # 有些关卡的参考解顶部就直接 `from deepface import DeepFace` 之类地导入重型
+    # 机器学习栈。这些依赖一旦在当前环境装不上（deepface 要求 tf-keras，而本机
+    # 是 tensorflow 2.21），**整个评测脚本会在跑任何测试之前就 ImportError 崩掉**，
+    # 于是该关卡永远「不可校验」。注意这与 `__main__` 演示门控是两个不同的问题：
+    # 门控管的是「不执行用户代码末尾的演示」，这里要救的是「模块顶层的 import 本身
+    # 就炸」。
+    #
+    # 处置原则（保守、可解释、不掩盖真实缺陷）：
+    #   * 只有当该模块**确实无法导入**时，才注入一个惰性替身；能装上的环境照常走真货，
+    #     绝不改变「依赖齐全时」的行为；
+    #   * 替身只要求「能被 import、能接收任意调用」，不伪装任何算法结果。
+    #     因此它只能让「接口契约」类断言（是否读取字节流、是否以 400 拒绝非法输入、
+    #     调用参数是否正确）成立，无法伪造真实识别准确率——本关的验收点也正在于此；
+    #   * 真正的重依赖一旦装上，替身自动失效，评测回到真实实现。
+    STUBBABLE_MODULES = ("deepface",)
+
+    STUBBABLE_MODULES = (("deepface", ("DeepFace",)),)
+
+    DEPENDENCY_STUB_PREAMBLE = "".join(
+        _DEPENDENCY_STUB_TEMPLATE.format(module=m, attr=a)
+        for m, attrs in STUBBABLE_MODULES
+        for a in attrs
+    )
 
     # 子进程严格白名单（绝对剥离内网数据库密码与无关敏感 Key）
     SAFE_ENV_WHITELIST = [
@@ -164,14 +306,51 @@ class SandboxRunner:
         self.default_timeout = default_timeout
         self.memory_limit_mb = memory_limit_mb
 
+    @staticmethod
+    def _memory_limit_supported() -> bool:
+        """在「父进程」侧探测 RLIMIT_AS 是否真的可设置
+
+        这样做的意义：preexec_fn 里的失败是无法在父进程捕获的（CPython 会直接
+        抛 SubprocessError 并丢弃子进程全部输出）。因此在父进程先掷一次同样的
+        setrlimit 做探针——探针的成功/失败是干净可捕获的，从而决定这次执行是否
+        需要挂 preexec_fn。探测本身只是把自己的软上限改成自己已经是的大小，无副作用。
+        """
+        if not resource:
+            return False
+        try:
+            current_soft, current_hard = resource.getrlimit(resource.RLIMIT_AS)
+            probe = min(current_soft, 1024 * 1024 * 1024)
+            resource.setrlimit(resource.RLIMIT_AS, (probe, current_hard))
+            return True
+        except Exception:
+            return False
+
     def _set_resource_limits(self):
-        """设置子进程资源配额限制 (Linux / macOS)"""
-        if resource:
-            try:
-                bytes_limit = self.memory_limit_mb * 1024 * 1024
-                resource.setrlimit(resource.RLIMIT_AS, (bytes_limit, bytes_limit))
-            except Exception:
-                pass
+        """设置子进程资源配额限制 (Linux / macOS)
+
+        注意：该函数运行在 fork 出来的子进程里（subprocess 的 preexec_fn）。
+        一旦这里抛出任何异常，CPython 会把整个 Popen 调用判为失败并抛出
+        `SubprocessError: Exception occurred in preexec_fn`，而且**捕获不到**
+        子进程的任何 stdio 输出——表现为「沙箱永远返回空 stdout/stderr」，
+        评测卡片全部退化成 unknown，学员点击【验证通关】永远无法通关。
+
+        macOS 上 RLIMIT_AS 是已知的不可设置项（setrlimit 直接报错），
+        因此这里彻底改为「尽力而为 + 绝不抛异常」：出问题时只记录降级标志，
+        由父进程读取后把内存限制标记为未生效，从而保证代码执行本身不受影响。
+        """
+        self._limit_degraded = False
+        self._limit_error = ""
+        if not resource:
+            self._limit_degraded = True
+            self._limit_error = "当前平台不支持 resource 模块"
+            return
+        try:
+            bytes_limit = self.memory_limit_mb * 1024 * 1024
+            resource.setrlimit(resource.RLIMIT_AS, (bytes_limit, bytes_limit))
+        except Exception as exc:
+            # 关键：preexec_fn 内绝不能向上抛异常，否则整个子进程输出都会丢失
+            self._limit_degraded = True
+            self._limit_error = f"{type(exc).__name__}: {exc}"
 
     def run_code(self, code: str, timeout: Optional[int] = None) -> Dict[str, Any]:
         """在隔离子进程中安全执行代码"""
@@ -200,7 +379,7 @@ class SandboxRunner:
             temp_path = f.name
 
         try:
-            preexec = self._set_resource_limits if sys.platform != "win32" else None
+            preexec = self._set_resource_limits if (sys.platform != "win32" and self._memory_limit_supported()) else None
             
             # 3. 环境变量白名单过滤与凭证脱敏
             child_env = {}
@@ -327,28 +506,31 @@ class SandboxRunner:
             if c["name"] in fail_map:
                 c["error_message"] = fail_map[c["name"]]
 
-        # 4. 若 verbosity 未生效（无 ok 标记），根据预期方法补全状态
-        if not cases and expected_tests:
+        # 4. 补齐尚未捕获到的预期用例，保证评测卡片与测试源码一一对应
+        # ------------------------------------------------------------------
+        # 注意：这里不能写成 `if not cases`。一套测试里只要有一条用例先被
+        # verbosity=2 的输出捕获到，剩下的用例就会全部缺失，前端评测卡片便
+        # 会「少几条」。而且在 unittest 的默认（非 verbose）输出下，全部用例
+        # 都只会汇总成一行 `Ran N tests ... OK`，解析不到任何 ok 标记，
+        # 此时必须靠源码里的 test_ 方法名补齐——否则卡片会全部退化成
+        # status="unknown"，学员看到「一条都没跑」的错误反馈。
+        if expected_tests:
             is_all_passed = ("\nOK" in raw_output) or raw_output.strip().endswith("OK")
             for tname in expected_tests:
-                if is_all_passed:
-                    cases.append({
-                        "name": tname,
-                        "status": "passed",
-                        "error_message": ""
-                    })
-                elif tname in fail_map:
-                    cases.append({
-                        "name": tname,
-                        "status": "failed",
-                        "error_message": fail_map[tname]
-                    })
+                if tname in seen_names:
+                    continue
+                if tname in fail_map:
+                    status, err = "failed", fail_map[tname]
+                elif is_all_passed:
+                    status, err = "passed", ""
                 else:
-                    cases.append({
-                        "name": tname,
-                        "status": "failed" if fail_map else "unknown",
-                        "error_message": "测试未执行或提前中断"
-                    })
+                    status, err = "unknown", "测试未执行或提前中断"
+                seen_names.add(tname)
+                cases.append({
+                    "name": tname,
+                    "status": status,
+                    "error_message": err
+                })
 
         return cases
 
@@ -363,9 +545,11 @@ class SandboxRunner:
 
         combined_code = f"""
 # --- USER CODE ---
+{self.MAIN_GUARD_PREAMBLE}
+{self.DEPENDENCY_STUB_PREAMBLE}
 {user_code}
 
-# --- TEST SUITE ---
+{self.MAIN_GUARD_EPILOGUE}# --- TEST SUITE ---
 {wrapped_test_code}
 """
         res = self.run_code(combined_code, timeout=timeout)

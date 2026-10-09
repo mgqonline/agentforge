@@ -42,14 +42,15 @@ PER_PHASE_TIMEOUT = 30
 # 这些占位测试由 curriculum_engine 自动生成（无真实评测点）。
 PLACEHOLDER_TEST_MARK = "self.assertTrue(True)"
 
-# 测试代码里出现的「外部依赖」导入：这些模块只在学员本机运行时存在，
-# 沙箱里没有，说明该测试根本不是为了在沙箱内评测参考解而写的。
+# 测试代码里出现的「沙箱内确实无法满足」的外部依赖导入。
+# 注意：`TestClient` 不在此列 —— 它随 `fastapi` 一起分发
+# （`fastapi.testclient`），沙箱里可直接导入，无需真的起 uvicorn 进程；
+# 12-fastapi-advanced / 16-face-recognition 两关的测试正是靠它在沙箱内自洽运行。
 _EXTERNAL_TEST_IMPORTS = (
     "from face_api import",
     "from test_accuracy import",
     "from more_fastapi_examples import",
     "uvicorn",
-    "TestClient",
 )
 
 # 测试具备「真实评测点」的信号：出现断言或 unittest 断言方法
@@ -128,18 +129,24 @@ def validate(only_phase: str = "") -> int:
         script = solution + "\n\n" + test_code
         start = time.time()
         try:
-            res = runner.run_code(script, timeout=PER_PHASE_TIMEOUT)
+            # 关键：这里必须复用运行时的 verify_code，而不是自己裸拼
+            # `solution + test_code`。verify_code 会注入 __main__ 门控，
+            # 让参考解末尾的演示脚本（`if __name__ == "__main__": asyncio.run(...)`）
+            # 在评测期不执行；裸拼则会让这些演示先跑起来——轻则触发真实模型调用
+            # 报「Missing credentials」，重则整段崩掉、把一个本来健康的关卡
+            # 误报成「教学内容缺陷」。自检必须校验学员真实走的那条代码路径。
+            res = runner.verify_code(solution, test_code, timeout=PER_PHASE_TIMEOUT)
         except Exception as e:
             failed.append((phase_id, f"沙箱调用异常: {e}"))
             print(f"  ❌ {phase_id}: 沙箱调用异常 {e}")
             continue
         elapsed = round(time.time() - start, 2)
 
-        if res.get("exit_code") == 0:
+        if res.get("passed"):
             passed.append(phase_id)
             print(f"  ✅ {phase_id}: 参考解通关 ({elapsed}s)")
         else:
-            stderr = (res.get("stderr") or "").strip()
+            stderr = ((res.get("details") or {}).get("stderr") or "").strip()
             tail = "\n      ".join(stderr.splitlines()[-8:]) or "(无 stderr)"
             failed.append((phase_id, stderr[-800:]))
             print(f"  ❌ {phase_id}: 参考解未能通关 ({elapsed}s)\n      {tail}")
