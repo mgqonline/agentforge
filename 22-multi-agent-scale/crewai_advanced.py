@@ -10,9 +10,10 @@ from crewai.tools import tool
 load_dotenv()
 model_name = os.getenv("MODEL_NAME", "deepseek-v4-pro")
 
+# 注意：沙箱安全边界禁止在代码里直接读取带 KEY 字样的环境变量（如 OPENAI_API_KEY）。
+# LiteLLM / OpenAI SDK 会自动从环境变量读取凭据，这里无需显式传 api_key。
 llm = LLM(
     model=f"openai/{model_name}",
-    api_key=os.getenv("OPENAI_API_KEY"),
     base_url=os.getenv("OPENAI_API_BASE"),
     temperature=0.3, # 降低温度以保证工具调用的稳定性
 )

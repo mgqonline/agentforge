@@ -1,6 +1,5 @@
 import os
 import torch
-import sys
 from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
 from qwen_vl_utils import process_vision_info
 
@@ -15,7 +14,7 @@ def main():
     
     if not os.path.exists(model_id):
         print(f"❌ 模型目录 {model_id} 不存在。请先运行 download_ms.py 等待下载完成。")
-        sys.exit(1)
+        return
         
     print(f"📥 正在从本地加载多模态模型: {model_id} ...")
     print("--------------------------------------------------")
@@ -35,7 +34,7 @@ def main():
         image_path = "test_vision_input.jpeg" 
         if not os.path.exists(image_path):
             print(f"❌ 找不到图片 {image_path}，请准备一张测试图片。")
-            sys.exit(1)
+            return
             
         print(f"✅ 成功读取测试图片: {image_path}")
 

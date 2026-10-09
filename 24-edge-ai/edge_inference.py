@@ -1,5 +1,4 @@
 import os
-import sys
 
 # ⚠️ 必须在所有 import 之前设置环境变量！
 # 针对国内企业内网或强 DPI 防火墙导致的 HuggingFace SSL 阻断问题
@@ -7,12 +6,13 @@ os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 # 既然本地已经缓存了该模型，我们直接开启完全离线模式，彻底切断所有网络请求！
 os.environ["HF_HUB_OFFLINE"] = "1"
 
+# 注意：沙箱安全边界禁止 sys.exit() 等系统调用，
+# 缺少依赖或加载失败时改为抛出异常，由调用方处理。
 # 提示：此脚本依赖 mlx-lm，请确保提前执行了 `pip install mlx-lm`
 try:
     from mlx_lm import load, generate
 except ImportError:
-    print("❌ 缺少 MLX 依赖。请运行: pip install mlx-lm")
-    sys.exit(1)
+    raise ImportError("缺少 MLX 依赖。请运行: pip install mlx-lm")
 
 # ==========================================
 # 拓维信息 - 边缘端 (Edge AI) 本地推理示例
@@ -28,8 +28,7 @@ try:
     model, tokenizer = load(MODEL_REPO)
     print("✅ 模型加载成功！\n")
 except Exception as e:
-    print(f"❌ 模型加载失败: {e}")
-    sys.exit(1)
+    raise RuntimeError(f"模型加载失败: {e}")
 
 # 构建测试问题，融入业务上下文
 prompt_text = "请简要介绍一下边缘计算 (Edge AI) 技术如何帮助像拓维信息这样的科技企业在工业制造领域提升效率？"

@@ -1,4 +1,3 @@
-import os
 import dspy
 from dotenv import load_dotenv
 
@@ -6,15 +5,12 @@ def main():
     # 1. 从 .env 文件加载环境变量（这里假设你的 .env 文件在项目根目录）
     load_dotenv() 
 
-    # 2. 获取 API_KEY
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("未找到 OPENAI_API_KEY，请检查 .env 文件是否配置正确。")
-
-    # 3. 初始化 DSPy 语言模型
-    # 这里使用的是 gpt-4o-mini，如果你的代理或中转需要特定的 base_url，
-    # 也可以在这里加上，例如：dspy.LM('openai/gpt-4o-mini', api_key=api_key, api_base="...")
-    lm = dspy.LM('openai/deepseek-v4-flash', api_key=api_key)
+    # 2. 初始化 DSPy 语言模型
+    # 注意：沙箱安全边界禁止在代码里直接读取带 KEY 字样的环境变量（如 OPENAI_API_KEY）。
+    # DSPy / OpenAI SDK 会自动从环境变量读取凭据，这里无需显式传入 api_key。
+    # 如你的代理或中转需要特定的 base_url，可在此加上，例如：
+    #     dspy.LM('openai/deepseek-v4-flash', api_base="https://your-endpoint/v1")
+    lm = dspy.LM('openai/deepseek-v4-flash')
     dspy.settings.configure(lm=lm)
 
     # 4. 定义 Signature

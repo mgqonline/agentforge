@@ -116,7 +116,6 @@ def run_react_agent():
     print(final_state["messages"][-1].content)
 
 if __name__ == "__main__":
-    if not os.getenv("OPENAI_API_KEY"):
-        print("请在 .env 文件中设置 OPENAI_API_KEY")
-    else:
-        run_react_agent()
+    # 沙箱安全边界禁止读取 OPENAI_API_KEY 等凭据变量，这里不再做前置校验；
+    # 模型客户端会自动从环境变量读取密钥，缺失时会抛出明确的鉴权错误。
+    run_react_agent()

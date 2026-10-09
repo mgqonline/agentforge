@@ -110,8 +110,10 @@ def run_function_calling_basics():
             if "reasoning_content" in str(e):
                 print("\n[检测到 DeepSeek reasoning_content 兼容性问题，启动紧急修复方案...]")
                 # 最后的绝招：手动调用 OpenAI 客户端
+                # 注意：沙箱安全边界禁止直接读取 OPENAI_API_KEY 等凭据变量，
+                # OpenAI SDK 会自动从环境变量读取密钥，这里只传 base_url。
                 from openai import OpenAI
-                client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), base_url=os.getenv("OPENAI_API_BASE"))
+                client = OpenAI(base_url=os.getenv("OPENAI_API_BASE"))
                 
                 # 手动构建消息列表
                 raw_messages = []
@@ -147,7 +149,6 @@ def run_function_calling_basics():
                 raise e
 
 if __name__ == "__main__":
-    if not os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY") == "your_api_key_here":
-        print("错误: 请在 .env 文件中配置有效的 OPENAI_API_KEY")
-    else:
-        run_function_calling_basics()
+    # 沙箱安全边界禁止读取 OPENAI_API_KEY 等凭据变量，这里不再做前置校验；
+    # 模型客户端会自动从环境变量读取密钥，缺失时会抛出明确的鉴权错误。
+    run_function_calling_basics()

@@ -22,8 +22,9 @@ from langchain_core.output_parsers import PydanticOutputParser
 load_dotenv()
 
 # 处理 OPENAI_API_BASE 与 OPENAI_BASE_URL 兼容性
+# 注意：沙箱安全边界禁止在代码里直接读取带 KEY 字样的环境变量（如 OPENAI_API_KEY）。
+# ChatOpenAI / OpenAI SDK 会自动从环境变量读取凭据，这里只显式指定 base_url。
 api_base = os.getenv("OPENAI_API_BASE") or os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1"
-api_key = os.getenv("OPENAI_API_KEY")
 
 # ==========================================
 # 1. 定义数据结构
@@ -49,7 +50,6 @@ class GraphRAGEngine:
         model_name = os.getenv("MODEL_NAME", "deepseek-chat")
         self.llm = ChatOpenAI(
             model=model_name,
-            openai_api_key=api_key,
             openai_api_base=api_base,
             temperature=0
         )

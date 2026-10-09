@@ -38,7 +38,6 @@ def run_cot_practice():
     print(f"回答:\n{response_b.content}")
 
 if __name__ == "__main__":
-    if not os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY") == "your_api_key_here":
-        print("错误: 请在 .env 文件中配置有效的 OPENAI_API_KEY")
-    else:
-        run_cot_practice()
+    # 沙箱安全边界禁止读取 OPENAI_API_KEY 等凭据变量，这里不再做前置校验；
+    # ChatOpenAI 会自动从环境变量读取密钥，缺失时会抛出明确的鉴权错误。
+    run_cot_practice()

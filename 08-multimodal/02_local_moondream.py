@@ -4,7 +4,6 @@ os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from PIL import Image
-import sys
 
 # ==============================================================
 # 02_local_moondream.py
@@ -44,7 +43,7 @@ def main():
             print(f"✅ 成功读取测试图片: {image_path} (大小: {image.size})")
         except Exception as e:
             print(f"❌ 找不到图片 {image_path}，请准备一张测试图片。")
-            sys.exit(1)
+            return
 
         # 3. 对图片进行视觉特征编码
         print("👁️ 模型正在'看'这张图片，提取视觉 Token...")

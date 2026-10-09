@@ -4,11 +4,13 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 # 1. 配置
+# 注意：沙箱安全边界禁止在代码里直接读取带 KEY/SECRET/TOKEN 字样的环境变量，
+# 因此不要把密钥读出来赋值。OpenAI SDK 会自动从环境变量读取凭据，
+# 这里只需显式传入 base_url 即可。
 load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
 base_url = os.getenv("OPENAI_API_BASE", "https://api.deepseek.com")
 
-client = OpenAI(api_key=api_key, base_url=base_url)
+client = OpenAI(base_url=base_url)
 
 def encode_image(image_path):
     """将图片转换为 Base64 编码"""

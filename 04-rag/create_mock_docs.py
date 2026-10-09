@@ -1,19 +1,17 @@
 import pandas as pd
-import subprocess
-import sys
 import os
 
-def install_and_import(package, import_name):
-    try:
-        __import__(import_name)
-    except ImportError:
-        print(f"Installing {package}...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+# 注意：沙箱安全边界禁止导入 subprocess 等受限系统模块（不允许代码自行安装依赖），
+# 也禁止 sys.exit() 等系统调用。这里改为仅做依赖可用性检查，缺失时抛出异常提示学员手动安装。
+def ensure_available(package, import_name):
+    from importlib.util import find_spec
+    if find_spec(import_name) is None:
+        raise ImportError(f"缺少依赖 {package}，请先手动安装： pip install {package}")
 
 # 确保必要的库存在
-install_and_import("fpdf", "fpdf")
-install_and_import("python-docx", "docx")
-install_and_import("openpyxl", "openpyxl")
+ensure_available("fpdf", "fpdf")
+ensure_available("python-docx", "docx")
+ensure_available("openpyxl", "openpyxl")
 
 from fpdf import FPDF
 import docx
