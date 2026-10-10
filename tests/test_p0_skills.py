@@ -24,7 +24,13 @@ from backend.skills.json_schema_skill import JsonSchemaCheckSkill  # noqa: E402
 from backend.skills.tool_param_check_skill import ToolParamCheckSkill  # noqa: E402
 from backend.skills.prompt_injection_skill import PromptInjectionSkill  # noqa: E402
 from backend.skills.sql_injection_skill import SqlInjectionSkill  # noqa: E402
-from backend.skills.hook_manager import create_hook_manager, get_hook_manager, run_input_hooks  # noqa: E402
+from backend.skills.hook_manager import (  # noqa: E402
+    create_hook_manager,
+    get_hook_manager,
+    run_input_hooks,
+    run_mid_hooks,
+    run_post_hooks,
+)
 
 
 # ---------------------- SqlResultCheckSkill ----------------------
@@ -287,6 +293,78 @@ def test_run_input_hooks_entrypoint_returns_none_when_clean():
 def test_get_hook_manager_is_singleton():
     """进程级单例：多次获取返回同一实例。"""
     assert get_hook_manager() is get_hook_manager()
+
+
+# ---------------------- Mid/Post Hook 接入入口（阶段 3） ----------------------
+def test_run_mid_hooks_blocks_write_sql_in_enforce_mode():
+    """Mid-Hook 入口：enforce=True 时非只读 SQL 被阻断。"""
+    import asyncio
+
+    hm = create_hook_manager(enforce=True)
+    res = asyncio.run(hm.run_mid_hooks("m1", "", {"sql": "DELETE FROM users WHERE id = 1"}))
+    assert res is not None
+    assert res.blocked is True
+
+
+def test_run_mid_hooks_shadow_hit_in_warn_mode():
+    """Mid-Hook 入口：告警模式下命中只打 shadow_hit，不阻断。"""
+    import asyncio
+
+    hm = create_hook_manager(enforce=False)
+    res = asyncio.run(hm.run_mid_hooks("m2", "", {"sql": "DROP TABLE orders"}))
+    assert res is not None
+    assert res.blocked is False
+    assert res.meta.get("shadow_hit") is True
+    assert res.meta.get("stage") == "mid"
+
+
+def test_run_mid_hooks_allows_readonly_sql():
+    import asyncio
+
+    hm = create_hook_manager(enforce=True)
+    # 只读 SQL 场景：带 sql 字段时跳过业务参数模型校验（否则会被默认模型误判为缺 query_type）。
+    res = asyncio.run(hm.run_mid_hooks("m3", "", {"sql": "SELECT count(*) FROM orders"}))
+    assert res is None or res.blocked is False
+
+
+def test_run_post_hooks_blocks_oversized_result_in_enforce_mode():
+    """Post-Hook 入口：enforce=True 时超过硬上限的结果集被阻断。"""
+    import asyncio
+
+    from backend.skills.hook_manager import HookManager, post_hook_sql_result_check
+
+    hm = HookManager(enforce=True)
+    hm.register_post_hook(post_hook_sql_result_check)
+    big_data = [{"a": i} for i in range(6000)]
+    res = asyncio.run(hm.run_post_hooks("p1", big_data))
+    assert res is not None
+    assert res.blocked is True
+
+
+def test_run_post_hooks_clean_result_passes():
+    import asyncio
+
+    res = asyncio.run(run_post_hooks("p2", [{"amount": 1}, {"amount": 2}]))
+    assert res is None or res.blocked is False
+
+
+def test_orchestrator_tool_node_wires_mid_and_post_hooks():
+    """阶段 3 回归：orchestrator_graph.build_expert_graph 的 tool_node 已接入 Mid/Post Hook。
+
+    这里做静态源码校验（不导入模块），避免 CI 未安装 langgraph 时无法运行。
+    """
+    from pathlib import Path
+
+    src_path = Path(__file__).resolve().parent.parent / "backend" / "orchestrator_graph.py"
+    source = src_path.read_text(encoding="utf-8")
+    tool_node_src = source[source.index("async def tool_node"): source.index("workflow = StateGraph(ExpertAgentState)")]
+
+    assert "get_hook_manager()" in tool_node_src
+    assert "run_mid_hooks(" in tool_node_src
+    assert "run_post_hooks(" in tool_node_src
+    # 关键顺序：Mid-Hook 必须先于工具执行，Post-Hook 必须晚于工具执行。
+    assert tool_node_src.index("run_mid_hooks(") < tool_node_src.index("execute_tool_call(")
+    assert tool_node_src.index("execute_tool_call(") < tool_node_src.index("run_post_hooks(")
 
 
 # ---------------------- SensitiveWordsSkill（业务敏感词） ----------------------

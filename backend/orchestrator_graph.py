@@ -338,11 +338,14 @@ def build_expert_graph(
     permissions: set,
     strip_badges_fn: Callable[[str], str] | None = None,
     max_tool_rounds: int = 4,
+    session_id: str = "anonymous",
 ) -> StateGraph:
     """
     构建专家模式 ReAct 循环 Agent 图，实现从 worker.py 的解耦抽离。
     """
     from tools import execute_tool_call
+    # 延迟导入：避免无 LangChain 环境下的导入耦合，同时复用进程级单例。
+    from skills import get_hook_manager
 
     async def agent_node(state: ExpertAgentState):
         await send_event({"type": "status", "content": "🧙‍♂️ [智能体总控制盘] 读入 PostgreSQL 长效期会话链与上下文记忆池..."})
@@ -448,14 +451,72 @@ def build_expert_graph(
                 tool_call_id = getattr(tool_call, "id", tool_name)
 
             await send_event({"type": "tool_call", "name": tool_name, "args": raw_args})
-            result = execute_tool_call(tool_name, raw_args, permissions)
-            result_json = json.dumps(result, ensure_ascii=False)
-            await send_event({"type": "tool_call_result", "name": tool_name, "result": result})
 
+            # ============ Mid-Hook：工具执行前安全校验（SQL 注入 / 工具入参） ============
+            # 灰度策略：默认告警模式只记录 shadow_hit，不阻断；AGENT_HOOK_ENFORCE=true 才硬拦截。
+            hook_manager = get_hook_manager()
+            tool_params: Dict[str, Any] = {}
+            if isinstance(raw_args, dict):
+                tool_params = dict(raw_args)
+            elif isinstance(raw_args, str) and raw_args.strip():
+                try:
+                    parsed_args = json.loads(raw_args)
+                    tool_params = parsed_args if isinstance(parsed_args, dict) else {"_raw": raw_args}
+                except (json.JSONDecodeError, TypeError):
+                    tool_params = {"_raw": raw_args}
+            if "sql" in tool_params:
+                # SQL 检测以 sql 字段为准，防止被其它字段稀释。
+                tool_params["sql"] = tool_params["sql"] if isinstance(tool_params["sql"], str) else str(tool_params["sql"])
+
+            try:
+                mid_check = await hook_manager.run_mid_hooks(session_id, "", tool_params)
+                if mid_check and mid_check.blocked:
+                    blocked_msg = f"🛡️ [安全拦截] 工具 {tool_name} 未通过 Mid-Hook 校验: {mid_check.reason}"
+                    await send_event({"type": "status", "content": blocked_msg})
+                    await send_event({"type": "tool_call_result", "name": tool_name, "result": {"ok": False, "error": blocked_msg}})
+                    tool_messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call_id,
+                        "content": json.dumps({"ok": False, "error": blocked_msg}, ensure_ascii=False),
+                    })
+                    continue
+                if mid_check and (mid_check.meta or {}).get("shadow_hit"):
+                    await send_event({"type": "status", "content": f"⚠️ [告警模式] 工具 {tool_name} Mid-Hook 命中（未阻断）: {mid_check.reason}"})
+            except Exception as hook_error:
+                # 安全兜底：Hook 自身异常不得造成业务中断，但必须留痕。
+                print(f"[Mid-Hook] 工具 {tool_name} 校验异常，已放行: {hook_error}")
+
+            raw_result = execute_tool_call(tool_name, raw_args, permissions)
+
+            # ============ Post-Hook：工具执行后结果校验（行数上限/脏数据/指纹） ============
+            hook_status = {"stage": "post", "blocked": False, "reason": ""}
+            try:
+                post_check = await hook_manager.run_post_hooks(session_id, raw_result)
+                if post_check and post_check.blocked:
+                    blocked_msg = f"🛡️ [安全拦截] 工具 {tool_name} 结果未通过 Post-Hook 校验: {post_check.reason}"
+                    hook_status = {"stage": "post", "blocked": True, "reason": post_check.reason or ""}
+                    await send_event({"type": "status", "content": blocked_msg})
+                    await send_event({"type": "tool_call_result", "name": tool_name, "result": {"ok": False, "error": blocked_msg}})
+                    tool_messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call_id,
+                        "content": json.dumps({"ok": False, "error": blocked_msg}, ensure_ascii=False),
+                    })
+                    continue
+                if post_check and (post_check.meta or {}).get("shadow_hit"):
+                    hook_status = {"stage": "post", "blocked": False, "reason": post_check.reason or ""}
+                    await send_event({"type": "status", "content": f"⚠️ [告警模式] 工具 {tool_name} Post-Hook 命中（未阻断）: {post_check.reason}"})
+                elif post_check and post_check.meta and post_check.meta.get("dataset_sha256"):
+                    hook_status = {"stage": "post", "blocked": False, "reason": "", "dataset_sha256": post_check.meta["dataset_sha256"]}
+            except Exception as hook_error:
+                print(f"[Post-Hook] 工具 {tool_name} 结果校验异常，已放行: {hook_error}")
+
+            # 结果正常时，把 Post-Hook 的校验结论随事件下发，供前端展示审计信息。
+            await send_event({"type": "tool_call_result", "name": tool_name, "result": raw_result, "hook": hook_status})
             tool_messages.append({
                 "role": "tool",
                 "tool_call_id": tool_call_id,
-                "content": result_json,
+                "content": json.dumps(raw_result, ensure_ascii=False),
             })
 
         return {

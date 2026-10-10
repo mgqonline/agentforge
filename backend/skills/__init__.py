@@ -11,6 +11,8 @@ from .hook_manager import (
     create_hook_manager,
     get_hook_manager,
     run_input_hooks,
+    run_mid_hooks,
+    run_post_hooks,
 )
 
 # Original Security Skills
@@ -33,6 +35,8 @@ __all__ = [
     "create_hook_manager",
     "get_hook_manager",
     "run_input_hooks",
+    "run_mid_hooks",
+    "run_post_hooks",
     # Security
     "PromptInjectionSkill",
     "PromptInjectionResult",

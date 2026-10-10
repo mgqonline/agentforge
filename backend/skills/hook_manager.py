@@ -216,6 +216,12 @@ async def mid_hook_tool_param_check(
     """P0：工具参数校验 Skill 包装（Mid Hook）。"""
     if tool_params is None:
         return HookResult(blocked=False, reason="no tool params, skip", payload=None, meta={})
+    # 纯 SQL 查询走 SqlInjectionSkill + SqlResultCheckSkill，业务参数模型无适配场景，
+    # 否则会被默认模型的必填字段误判为「参数缺失」。
+    if "sql" in tool_params and "param_model" not in tool_params:
+        pool = {k: v for k, v in tool_params.items() if k not in {"sql", "schema", "param_model"}}
+        if not pool:
+            return HookResult(blocked=False, reason="sql-only tool call, skip param model", payload=tool_params, meta={})
     # 业务可通过 tool_params["param_model"] 注入自定义 Pydantic 模型。
     model = (tool_params or {}).get("param_model") or _DefaultQueryParam
     skill = ToolParamCheckSkill(param_model=model)
@@ -283,3 +289,24 @@ async def run_input_hooks(session_id: str, user_query: str) -> Optional[HookResu
     （告警模式下 blocked 恒为 False，但 meta 中会带 shadow_hit 标记。）
     """
     return await get_hook_manager().run_pre_hooks(session_id, user_query)
+
+
+async def run_mid_hooks(
+    session_id: str,
+    llm_raw_output: str,
+    tool_params: Optional[Dict[str, Any]] = None,
+) -> Optional[HookResult]:
+    """接入用便捷入口：执行 Mid-Hook（工具/SQL 调用前安全与参数校验）。
+
+    返回 None 表示全部放行；返回 HookResult 时看 blocked 决定是否终止本次工具调用。
+    （告警模式下 blocked 恒为 False，但 meta 中会带 shadow_hit 标记。）
+    """
+    return await get_hook_manager().run_mid_hooks(session_id, llm_raw_output, tool_params)
+
+
+async def run_post_hooks(session_id: str, result_data: Any) -> Optional[HookResult]:
+    """接入用便捷入口：执行 Post-Hook（工具/SQL 结果校验与审计）。
+
+    返回 None 表示无命中；返回 HookResult 时看 blocked 决定是否丢弃本次工具结果。
+    """
+    return await get_hook_manager().run_post_hooks(session_id, result_data)
