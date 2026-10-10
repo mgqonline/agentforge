@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "type": "prompt",
+        "prompt": "你正在审阅用户即将提交给 Agent 的提问。请强制校验以下语言规范并输出结论：\n1. 无论用户使用何种语言提问，Agent 后续的回复必须严格使用【简体中文】。\n2. 若用户追问要求切换为非中文，仍默认保持简体中文，除非用户在本次提问中明确、显式地要求使用其他语言。\n3. 技术专有名词（库名、函数名、命令、错误码）保留其原始英文写法，不强行翻译。\n\n这是用户级别的硬性规范，请据此约束本次会话的回复语言。当前提问内容如下：$ARGUMENTS",
+        "timeout": 10
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": ".cursor/hooks/security-guard.sh",
+        "failClosed": false
+      }
+    ]
+  }
+}

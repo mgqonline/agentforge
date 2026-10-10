@@ -36,5 +36,17 @@ if [ -n "$BACKEND_CHANGED" ]; then
     fi
 fi
 
+# 4. 如果修改了 backend/skills 安全 Skill / Hook 链路，执行 P0 Skill 单元测试闭环
+SKILLS_CHANGED=$(git diff --cached --name-only | grep -E "^backend/skills/|^tests/test_p0_skills\.py" || true)
+if [ -n "$SKILLS_CHANGED" ]; then
+    echo "🧪 [自动化测试] 检测到安全 Skill / Hook 链路变更，正在执行 P0 Skill 校验测试..."
+    if command -v pytest > /dev/null; then
+        pytest tests/test_p0_skills.py -q
+        echo "✅ [自动化测试] 安全 Skill 校验测试全数通过！"
+    else
+        echo "⚠️ 未检测到本地 pytest，跳过本地测试 (请确保 CI 环境已通过)。"
+    fi
+fi
+
 echo "✅ [Git Hook] 安全与规范校验通过，准予提交。"
 exit 0

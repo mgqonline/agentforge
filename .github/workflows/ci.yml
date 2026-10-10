@@ -49,6 +49,10 @@ jobs:
         run: |
           python backend/security_sandbox.py
 
+      - name: Run Security Hook & P0 Skill Checks
+        run: |
+          python -m pytest tests/test_p0_skills.py -v
+
       - name: Validate React Frontend
         uses: actions/setup-node@v4
         with:

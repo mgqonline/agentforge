@@ -18,6 +18,7 @@ websockets                # WebSocket 语音/对话通道
 # ---- 认证与安全 ----
 cryptography              # 令牌/签名加密原语
 PyJWT                     # JWT 签发与校验
+jsonschema                # backend/skills JSON Schema 强校验 (JsonSchemaCheckSkill)
 
 # ---- 数据库与持久化 ----
 SQLAlchemy
