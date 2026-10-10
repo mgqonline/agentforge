@@ -5,7 +5,13 @@
 """
 
 # Hook Manager & HookResult
-from .hook_manager import HookManager, HookResult, create_hook_manager
+from .hook_manager import (
+    HookManager,
+    HookResult,
+    create_hook_manager,
+    get_hook_manager,
+    run_input_hooks,
+)
 
 # Original Security Skills
 from .prompt_injection_skill import PromptInjectionSkill, PromptInjectionResult
@@ -22,6 +28,8 @@ __all__ = [
     "HookManager",
     "HookResult",
     "create_hook_manager",
+    "get_hook_manager",
+    "run_input_hooks",
     # Security
     "PromptInjectionSkill",
     "PromptInjectionResult",

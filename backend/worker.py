@@ -23,6 +23,7 @@ from agent_governance import (
     record_tool_run,
     verify_approval_decision,
 )
+from skills import run_input_hooks
 
 ocr_reader = None
 def get_ocr_reader():
@@ -480,6 +481,25 @@ async def async_process_request(
             return
 
         await base_ws_send(data)
+
+    # Pre-Hook：用户输入安全校验（提示词注入 / 越狱检测）
+    # 灰度策略：默认告警模式（AGENT_HOOK_ENFORCE=false）只记录不阻断；
+    # 设为 true 后，命中即返回受控拦截提示并终止本次请求。
+    try:
+        pre_check = await run_input_hooks(session_id, user_msg)
+        if pre_check and pre_check.blocked:
+            await ws_send({
+                "type": "stream_end",
+            })
+            await base_ws_send({
+                "type": "stream_chunk",
+                "content": f"\n\n> 🛡️ **[安全拦截]**: {pre_check.reason or '本次输入未通过安全校验。'}",
+            })
+            await base_ws_send({"type": "stream_end"})
+            return
+    except Exception as hook_error:
+        # Hook 异常不得中断业务主流程，记录后放行（fail-open）。
+        print(f"[Pre-Hook] 输入安全校验异常，已放行: {hook_error}")
 
     try:
         if audio_data:

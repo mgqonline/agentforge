@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Dict, List, Optional
@@ -24,6 +25,7 @@ from .sql_injection_skill import SqlInjectionSkill
 from .sql_result_check_skill import SqlResultCheckSkill
 from .json_schema_skill import JsonSchemaCheckSkill
 from .tool_param_check_skill import ToolParamCheckSkill
+from .security_log_skill import SecurityLogSkill
 
 
 # ====================== 统一返回结构体 ======================
@@ -42,9 +44,19 @@ PostHookFn = Callable[[str, Any], Awaitable[HookResult]]
 
 
 class HookManager:
-    """统一调度 Pre / Mid / Post 三层 Hook。"""
+    """统一调度 Pre / Mid / Post 三层 Hook。
 
-    def __init__(self) -> None:
+    灰度策略（设计附录第 11 节）：
+    - `enforce=False`（默认告警模式）：命中只记审计日志与告警，不阻断主链路，
+      用于上线初期统计误判率。
+    - `enforce=True`（硬阻断模式）：命中即返回 blocked=True，链路终止。
+    - 默认值由环境变量 `AGENT_HOOK_ENFORCE` 决定（"true" 才开启硬阻断）。
+    """
+
+    def __init__(self, enforce: Optional[bool] = None) -> None:
+        if enforce is None:
+            enforce = os.getenv("AGENT_HOOK_ENFORCE", "false").lower() == "true"
+        self.enforce = enforce
         self.pre_hooks: List[PreHookFn] = []
         self.mid_hooks: List[MidHookFn] = []
         self.post_hooks: List[PostHookFn] = []
@@ -61,12 +73,31 @@ class HookManager:
         """注册 Post-Hook：SQL/工具执行完成，拿到返回结果之后。"""
         self.post_hooks.append(hook_func)
 
+    def _apply_enforcement(self, stage: str, session_id: str, res: HookResult) -> HookResult:
+        """按 enforce 开关决定是否真正阻断。
+
+        告警模式下命中不阻断，但会：
+        1. 在结果 meta 上标记 shadow_hit，供上层记录/观测；
+        2. 写一条告警级审计日志，便于统计误判率。
+        """
+        if self.enforce or not res.blocked:
+            return res
+        res.meta = {**(res.meta or {}), "shadow_hit": True, "stage": stage}
+        SecurityLogSkill.log_security_event(
+            event_type=f"HOOK_SHADOW_HIT_{stage.upper()}",
+            session_id=session_id,
+            blocked=False,
+            reason=f"[告警模式] {res.reason}",
+            payload={"stage": stage, "meta": res.meta},
+        )
+        return HookResult(blocked=False, reason=res.reason, payload=res.payload, meta=res.meta)
+
     async def run_pre_hooks(self, session_id: str, user_query: str) -> Optional[HookResult]:
         """执行 Pre 阶段所有 Hook，遇到 blocked 直接返回。"""
         for hook in self.pre_hooks:
             res: HookResult = await hook(session_id, user_query)
             if res.blocked:
-                return res
+                return self._apply_enforcement("pre", session_id, res)
         return None
 
     async def run_mid_hooks(
@@ -79,7 +110,7 @@ class HookManager:
         for hook in self.mid_hooks:
             res: HookResult = await hook(session_id, llm_raw_output, tool_params)
             if res.blocked:
-                return res
+                return self._apply_enforcement("mid", session_id, res)
         return None
 
     async def run_post_hooks(self, session_id: str, result_data: Any) -> Optional[HookResult]:
@@ -87,7 +118,7 @@ class HookManager:
         for hook in self.post_hooks:
             res: HookResult = await hook(session_id, result_data)
             if res.blocked:
-                return res
+                return self._apply_enforcement("post", session_id, res)
         return None
 
 
@@ -212,9 +243,12 @@ async def post_hook_sql_result_check(session_id: str, result_data: Any) -> HookR
 
 
 # ====================== 【工厂函数：快速初始化完整 Hook 管理器】 ======================
-def create_hook_manager() -> HookManager:
-    """一次性注册所有线上启用 Hook，开启/关闭 Skill 不侵入业务主流程。"""
-    hm = HookManager()
+def create_hook_manager(enforce: Optional[bool] = None) -> HookManager:
+    """一次性注册所有线上启用 Hook，开启/关闭 Skill 不侵入业务主流程。
+
+    :param enforce: True=硬阻断，False=告警模式，None=读取环境变量 AGENT_HOOK_ENFORCE。
+    """
+    hm = HookManager(enforce=enforce)
 
     # Pre Hook
     hm.register_pre_hook(pre_hook_prompt_injection)
@@ -228,3 +262,24 @@ def create_hook_manager() -> HookManager:
     hm.register_post_hook(post_hook_sql_result_check)
 
     return hm
+
+
+# 进程级单例：避免每个请求重复构建 Hook 链路。
+_hook_manager_singleton: Optional[HookManager] = None
+
+
+def get_hook_manager() -> HookManager:
+    """获取进程级共享的 HookManager（懒加载单例）。"""
+    global _hook_manager_singleton
+    if _hook_manager_singleton is None:
+        _hook_manager_singleton = create_hook_manager()
+    return _hook_manager_singleton
+
+
+async def run_input_hooks(session_id: str, user_query: str) -> Optional[HookResult]:
+    """接入用便捷入口：执行 Pre-Hook 输入安全校验。
+
+    返回 None 表示放行；返回 HookResult 且 blocked=True 表示应拒绝本次请求。
+    （告警模式下 blocked 恒为 False，但 meta 中会带 shadow_hit 标记。）
+    """
+    return await get_hook_manager().run_pre_hooks(session_id, user_query)
