@@ -74,44 +74,9 @@ app.include_router(knowledge_router)
 
 
 # ==========================================
-# 2. 敏感词过滤 API (模拟企业安全风控网关)
+# 2. 敏感词过滤（已收敛至 backend/skills/sensitive_words_skill.py）
 # ==========================================
-import re
-async def check_sensitive_words(text: str) -> bool:
-    """
-    模拟调用企业级敏感词 API。
-    返回 True 表示存在敏感词，False 表示安全。
-    """
-    # 模拟外部 API 延迟
-    await asyncio.sleep(0.1)
-    
-    # 内置黑名单库 (实际中应该通过 REST API 向安全合规中心发起请求)
-    black_list = [r"涉密", r"内部核算", r"机密代码", r"黑客", r"脱库"]
-    for pattern in black_list:
-        if re.search(pattern, text, re.IGNORECASE):
-            return True
-    return False
-
-async def check_prompt_injection(text: str) -> bool:
-    """
-    基于启发式规则拦截常见的 Prompt Injection 攻击。
-    """
-    injection_patterns = [
-        r"ignore previous",
-        r"忽略.*?指令",
-        r"system prompt",
-        r"系统提示词",
-        r"you are now",
-        r"现在你是",
-        r"forget everything",
-        r"忘记一切",
-        r"bypass",
-        r"绕过"
-    ]
-    for pattern in injection_patterns:
-        if re.search(pattern, text, re.IGNORECASE):
-            return True
-    return False
+from skills import check_sensitive_words
 
 model_name = os.getenv("PRIMARY_MODEL", os.getenv("MODEL_NAME", "deepseek-v4-1-flash"))
 api_key = os.getenv("PRIMARY_API_KEY") or os.getenv("OPENAI_API_KEY", "dummy")

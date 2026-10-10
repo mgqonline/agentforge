@@ -289,5 +289,38 @@ def test_get_hook_manager_is_singleton():
     assert get_hook_manager() is get_hook_manager()
 
 
+# ---------------------- SensitiveWordsSkill（业务敏感词） ----------------------
+from backend.skills.sensitive_words_skill import SensitiveWordsSkill, check_sensitive_words  # noqa: E402
+
+
+def test_sensitive_words_blocks_known_term():
+    skill = SensitiveWordsSkill()
+    res = skill.run("sw1", "这段内容涉及涉密信息")
+    assert res.blocked is True
+    assert "涉密" in res.meta["matched_words"]
+
+
+def test_sensitive_words_allows_clean_input():
+    skill = SensitiveWordsSkill()
+    res = skill.run("sw2", "帮我查询上月销售额")
+    assert res.blocked is False
+    assert res.meta["matched_words"] == []
+
+
+def test_sensitive_words_disabled():
+    skill = SensitiveWordsSkill(enable=False)
+    res = skill.run("sw3", "涉密内容")
+    assert res.blocked is False
+    assert res.reason == "skill disabled"
+
+
+def test_sensitive_words_async_compat():
+    """向后兼容 async 入口：返回 bool。"""
+    import asyncio
+
+    assert asyncio.run(check_sensitive_words("包含黑客工具")) is True
+    assert asyncio.run(check_sensitive_words("正常业务查询")) is False
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
