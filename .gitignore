@@ -103,6 +103,33 @@ temp/
 *.pem
 *.key
 *.cert
+# 8.1 常见凭据文件与密钥物料（严禁入库）
+.env.*
+!.env.example
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.ppk
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+id_ecdsa
+id_ecdsa.*
+*.secret
+secrets/
+credentials.json
+service-account*.json
+serviceAccountKey*.json
+.npmrc
+.pypirc
+.aws/credentials
+.aws/config
+.kube/config
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
 
 # 9. 操作系统与 IDE 编辑器配置文件
 .DS_Store

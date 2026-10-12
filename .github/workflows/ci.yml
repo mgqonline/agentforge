@@ -7,6 +7,28 @@ on:
     branches: [ main, master ]
 
 jobs:
+  secret-scan:
+    name: Secret Leak Guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # 全量历史，才能扫出历史提交中的凭据
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Scan Git History for Leaked Credentials
+        run: |
+          python tools/secret_scan.py --history
+
+      - name: Scan Working Tree for Leaked Credentials
+        run: |
+          python tools/secret_scan.py
+
   smoke-and-security:
     name: E2E Smoke & Security Hardening Check
     runs-on: ubuntu-latest

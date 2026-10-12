@@ -8,6 +8,17 @@ set -e
 
 echo "🔍 [Git Hook] 正在执行提交前安全边界与工程规范审查..."
 
+# 0. 密钥扫描：离线指纹规则全量扫描暂存区，命中即阻断（含 OpenAI/AWS/GCP/GitHub 等）
+if command -v python3 > /dev/null; then
+    if ! python3 tools/secret_scan.py --staged; then
+        echo "❌ [安全拦截] 暂存区检测到疑似真实凭据，提交已终止。"
+        echo "处置流程见 docs/security/密钥泄漏应急响应.md。"
+        exit 1
+    fi
+else
+    echo "⚠️ 未检测到 python3，跳过离线密钥扫描 (CI 仍会强制校验)。"
+fi
+
 # 1. 检测是否包含真实敏感凭证 (排除测试用例与规则定义文件)
 STAGED_DIFF=$(git diff --cached -U0 -- ':!backend/test_sandbox_security.py' ':!*.md')
 if echo "$STAGED_DIFF" | grep -E "^\+[ ]*(sk-[a-zA-Z0-9]{32,}|ghp_[a-zA-Z0-9]{36,}|AIzaSy[a-zA-Z0-9_-]{33})" > /dev/null; then
